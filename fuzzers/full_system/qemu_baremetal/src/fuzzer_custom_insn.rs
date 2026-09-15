@@ -118,20 +118,20 @@ pub fn fuzz() {
             .unwrap()
         });
 
+        // Setup an havoc mutator with a mutational stage
+        let mutator = HavocScheduledMutator::new(havoc_mutations());
+        let calibration_feedback = MaxMapFeedback::new(&edges_observer);
+        let stages = tuple_list!(
+            StdMutationalStage::new(mutator),
+            CalibrationStage::new(&calibration_feedback)
+        );
+
         // A minimization+queue policy to get testcasess from the corpus
         let scheduler =
             IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
-        // Setup an havoc mutator with a mutational stage
-        let mutator = HavocScheduledMutator::new(havoc_mutations());
-        let calibration_feedback = MaxMapFeedback::new(&edges_observer);
-        let mut stages = tuple_list!(
-            StdMutationalStage::new(mutator),
-            CalibrationStage::new(&calibration_feedback)
-        );
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
         // Create a QEMU in-process executor
         let mut executor = QemuExecutor::new(
@@ -159,7 +159,7 @@ pub fn fuzz() {
         }
 
         fuzzer
-            .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+            .fuzz_loop(&mut executor, &mut state, &mut mgr)
             .unwrap();
         Ok(())
     };

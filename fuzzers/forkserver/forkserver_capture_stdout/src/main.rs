@@ -11,13 +11,13 @@ use libafl::{
     },
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{HavocScheduledMutator, Tokens, havoc_mutations, tokens_mutations},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, StdOutObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::mutational::StdMutationalStage,
+    stages::StdMutationalStage,
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
@@ -160,17 +160,14 @@ pub fn main() {
     // such as the notification of the addition of a new item to the corpus
     let mut mgr = SimpleEventManager::new(monitor);
 
-    // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
-
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     // If we should debug the child
     let debug_child = opt.debug_child;
 
     // Create the executor for the forkserver
     let args = opt.arguments;
+
+    // A minimization+queue policy to get testcasess from the corpus
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
     let observer_ref = edges_observer.handle();
     let stdout = StdOutObserver::new("stdout".into()).expect("observer");
@@ -209,6 +206,17 @@ pub fn main() {
     }
 
     let mut executor = DiffExecutor::new(executor, cmd_executor, ());
+
+    state.add_metadata(tokens);
+
+    // Setup a mutational stage with a basic bytes mutator
+    let mutator =
+        HavocScheduledMutator::with_max_stack_pow(havoc_mutations().merge(tokens_mutations()), 6);
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
+
     // In case the corpus is empty (on first run), reset
     if state.must_load_initial_inputs() {
         state
@@ -219,16 +227,9 @@ pub fn main() {
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    state.add_metadata(tokens);
-
-    // Setup a mutational stage with a basic bytes mutator
-    let mutator =
-        HavocScheduledMutator::with_max_stack_pow(havoc_mutations().merge(tokens_mutations()), 6);
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
     for _ in 0..5 {
         fuzzer
-            .fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)
+            .fuzz_one(&mut executor, &mut state, &mut mgr)
             .unwrap();
 
         let stdout = executor

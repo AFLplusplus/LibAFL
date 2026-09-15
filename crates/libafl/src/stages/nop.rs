@@ -1,6 +1,6 @@
 //! A nop stage does nothing
 
-use super::{Restartable, Stage};
+use super::{Restartable, pull::Stage};
 
 /// A stage that does nothing
 #[derive(Debug, Copy, Clone, Default)]

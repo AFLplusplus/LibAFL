@@ -234,7 +234,7 @@ pub fn fuzz() -> Result<(), Error> {
     });
 
     let scheduler = QueueScheduler::new();
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, tuple_list!());
 
     #[cfg(feature = "fork")]
     let mut harness = |_emulator: &mut _, input: &BytesInput| {

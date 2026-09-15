@@ -1,323 +1,712 @@
-//! [`PushStage`]`s` return inputs instead of calling an executor
+//! Pure push-based stages for `LibAFL`.
 //!
-//! While normal stages call the executor over and over again, push stages turn this concept upside down:
-//! A push stage instead returns an iterator that generates a new result for each time it gets called.
-//! With the new testcase, you will have to take care about testcase execution, manually.
-//! The push stage relies on internal mutability of the supplied `Observers`.
+//! Unlike traditional stages where the stage executes inputs inside a loop, push stages
+//! act as generator state machines. They yield [`ExecutionRequest`]s containing 1..N inputs
+//! to be executed by the target executor, and receive execution observations in subsequent steps.
 
-/// Mutational stage is the normal fuzzing stage.
+pub mod calibrate;
+pub mod colorization;
+#[cfg(feature = "std")]
+pub mod dump;
+pub mod dynamic;
+pub mod generalization;
+pub mod generation;
+pub mod logics;
 pub mod mutational;
-use alloc::{
-    borrow::{Cow, ToOwned},
-    rc::Rc,
-    string::ToString,
-};
-use core::{
-    cell::{Cell, RefCell},
-    marker::PhantomData,
-};
+pub mod power;
+pub mod replay;
+pub mod shadow;
+#[cfg(feature = "std")]
+pub mod sync;
+pub mod time_tracker;
+pub mod tmin;
+pub mod tracing;
+pub mod tuneable;
+#[cfg(feature = "unicode")]
+pub mod unicode;
 
-use libafl_bolts::Named;
-pub use mutational::StdMutationalPushStage;
+#[cfg(feature = "std")]
+pub mod verify_timeouts;
+
+use core::fmt::Debug;
+
+// Canonical Stage exports
+pub use calibrate::{CalibrationPushStage, CalibrationStage};
+pub use colorization::{ColorizationPushStage, ColorizationStage};
+#[cfg(feature = "std")]
+pub use dump::{DumpToDiskPushStage, DumpToDiskStage};
+pub use dynamic::{DynamicPushStage, DynamicStage};
+pub use generalization::{GeneralizationPushStage, GeneralizationStage};
+pub use generation::{GenerationPushStage, GenerationStage};
+use libafl_bolts::{Error, Named, tuples::HasConstLen};
+pub use logics::{
+    ClosurePushStage, ClosureStage, IfElsePushStage, IfElseStage, IfPushStage, IfStage,
+    WhilePushStage, WhileStage,
+};
+pub use mutational::{
+    MultiMutationalPushStage, MultiMutationalStage, StdMutationalPushStage, StdMutationalStage,
+    StdTransformingMutationalPushStage, StdTransformingMutationalStage,
+};
+pub use power::{StdPowerMutationalPushStage, StdPowerMutationalStage};
+pub use replay::{ReplayPushStage, ReplayStage};
+use serde::{Deserialize, Serialize};
+pub use shadow::{ShadowPushStage, ShadowStage, ShadowStage as ShadowTracingStage};
+#[cfg(feature = "std")]
+pub use sync::{SyncFromDiskPushStage, SyncFromDiskStage};
+pub use time_tracker::{TimeTrackingPushStage, TimeTrackingStage};
+pub use tmin::{StdTMinMutationalPushStage, StdTMinMutationalStage};
+pub use tracing::{
+    AflppCmplogTracingPushStage, AflppCmplogTracingStage, TracingPushStage, TracingStage,
+};
+pub use tuneable::{TuneableMutationalPushStage, TuneableMutationalStage};
+#[cfg(feature = "unicode")]
+pub use unicode::{UnicodeMutationalPushStage, UnicodeMutationalStage};
+#[cfg(feature = "std")]
+pub use verify_timeouts::{VerifyTimeoutsPushStage, VerifyTimeoutsStage};
 
 use crate::{
-    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasMetadata, HasScheduler,
-    common::HasNamedMetadata,
-    corpus::{CorpusId, HasCurrentCorpusId},
-    events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
-    executors::{Executor, ExitKind, HasObservers},
-    observers::ObserversTuple,
-    schedulers::Scheduler,
-    stages::{Restartable, RetryCountRestartHelper, Stage},
-    state::{HasCorpus, HasExecutions, HasLastReportTime, HasRand},
+    fuzzer::ExecutionRequest,
+    stages::StageId,
+    state::{HasCurrentStageId, Stoppable},
 };
 
-// The shared state for all [`PushStage`]s
-/// Should be stored inside a `[Rc<RefCell<_>>`]
+/// Serializable metadata storing progress of a push stage for deterministic restart and persistence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct StageProgressMetadata {
+    /// Total testcases / iterations planned for this stage round.
+    pub testcases_to_do: usize,
+    /// Testcases / iterations already completed.
+    pub testcases_done: usize,
+}
+
+libafl_bolts::impl_serdeany!(StageProgressMetadata);
+
+/// Step result yielded by a [`PushStage`].
 #[derive(Debug, Clone)]
-pub struct PushStageSharedState<EM, I, OT, S, Z> {
-    /// The state
-    pub state: S,
-    /// The [`crate::fuzzer::Fuzzer`] instance
-    pub fuzzer: Z,
-    /// The event manager
-    pub event_mgr: EM,
-    /// The [`ObserversTuple`]
-    pub observers: OT,
-    phantom: PhantomData<I>,
+pub enum StageStep<I> {
+    /// The stage generated inputs to execute.
+    Execute(ExecutionRequest<I>),
+    /// The stage has completed all iterations for the current corpus item.
+    Done,
 }
 
-impl<EM, I, OT, S, Z> PushStageSharedState<EM, I, OT, S, Z> {
-    /// Create a new `PushStageSharedState` that can be used by all [`PushStage`]s
-    #[must_use]
-    pub fn new(fuzzer: Z, state: S, observers: OT, event_mgr: EM) -> Self {
-        Self {
-            state,
-            fuzzer,
-            event_mgr,
-            observers,
-            phantom: PhantomData,
-        }
-    }
-}
+/// A stage generator.
+pub trait Stage<EM, I, OT, S>: Named {
+    /// Initialize the stage for the current corpus item.
+    fn init(&mut self, state: &mut S, manager: &mut EM) -> Result<(), Error>;
 
-/// Helper class for the [`PushStage`] trait, taking care of borrowing the shared state
-#[derive(Debug, Clone)]
-pub struct PushStageHelper<EM, I, OT, S, Z> {
-    /// If this stage has already been initalized.
-    /// This gets reset to `false` after one iteration of the stage is done.
-    pub initialized: bool,
-    /// The shared state, keeping track of the corpus and the fuzzer
-    #[expect(clippy::type_complexity)]
-    pub shared_state: Rc<RefCell<Option<PushStageSharedState<EM, I, OT, S, Z>>>>,
-    /// If the last iteration failed
-    pub errored: bool,
+    /// Advance the stage, generating the next execution request or signaling completion.
+    fn step(&mut self, state: &mut S, manager: &mut EM) -> Result<StageStep<I>, Error>;
 
-    /// The corpus index we're currently working on
-    pub current_corpus_id: Option<CorpusId>,
-
-    /// The input we just ran
-    pub current_input: Option<I>, // Todo: Get rid of copy
-
-    exit_kind: Rc<Cell<Option<ExitKind>>>,
-}
-
-impl<EM, I, OT, S, Z> PushStageHelper<EM, I, OT, S, Z> {
-    /// Create a new [`PushStageHelper`]
-    #[must_use]
-    #[expect(clippy::type_complexity)]
-    pub fn new(
-        shared_state: Rc<RefCell<Option<PushStageSharedState<EM, I, OT, S, Z>>>>,
-        exit_kind_ref: Rc<Cell<Option<ExitKind>>>,
-    ) -> Self {
-        Self {
-            shared_state,
-            initialized: false,
-            exit_kind: exit_kind_ref,
-            errored: false,
-            current_input: None,
-            current_corpus_id: None,
-        }
-    }
-
-    /// Sets the shared state for this helper (and all other helpers owning the same [`RefCell`])
-    #[inline]
-    pub fn set_shared_state(&mut self, shared_state: PushStageSharedState<EM, I, OT, S, Z>) {
-        (*self.shared_state.borrow_mut()).replace(shared_state);
-    }
-
-    /// Takes the shared state from this helper, replacing it with `None`
-    #[inline]
-    pub fn take_shared_state(&mut self) -> Option<PushStageSharedState<EM, I, OT, S, Z>> {
-        let shared_state_ref = &mut (*self.shared_state).borrow_mut();
-        shared_state_ref.take()
-    }
-
-    /// Returns the exit kind of the last run
-    #[inline]
-    #[must_use]
-    pub fn exit_kind(&self) -> Option<ExitKind> {
-        self.exit_kind.get()
-    }
-
-    /// Resets the exit kind
-    #[inline]
-    pub fn reset_exit_kind(&mut self) {
-        self.exit_kind.set(None);
-    }
-
-    /// Resets this state after a full stage iter.
-    fn end_of_iter(&mut self, shared_state: PushStageSharedState<EM, I, OT, S, Z>, errored: bool) {
-        self.set_shared_state(shared_state);
-        self.errored = errored;
-        self.current_corpus_id = None;
-        if errored {
-            self.initialized = false;
-        }
-    }
-}
-
-/// A push stage is a generator that returns a single testcase for each call.
-/// It's an iterator so we can chain it.
-/// After it has finished once, we will call it agan for the next fuzzer round.
-pub trait PushStage<EM, I, OT, S, Z> {
-    /// Gets the [`PushStageHelper`]
-    fn push_stage_helper(&self) -> &PushStageHelper<EM, I, OT, S, Z>;
-    /// Gets the [`PushStageHelper`] (mutable)
-    fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<EM, I, OT, S, Z>;
-
-    /// Set the current corpus index this stage works on
-    fn set_current_corpus_id(&mut self, corpus_id: CorpusId) {
-        self.push_stage_helper_mut().current_corpus_id = Some(corpus_id);
-    }
-
-    /// Called by `next_std` when this stage is being initialized.
-    /// This is called before the first iteration of the stage.
-    /// After the stage has finished once (after `deinit`), this will be called again.
-    #[inline]
-    fn init(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _observers: &mut OT,
-    ) -> Result<(), Error> {
-        Ok(())
-    }
-
-    /// Called before the a test case is executed.
-    /// Should return the test case to be executed.
-    /// After this stage has finished, or if the stage does not process any inputs, this should return `None`.
-    fn pre_exec(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _observers: &mut OT,
-    ) -> Option<Result<I, Error>>;
-
-    /// Called after the execution of a testcase finished.
-    #[inline]
+    /// Optional callback invoked after an execution observation for an input generated by this stage is processed.
     fn post_exec(
         &mut self,
-        _fuzzer: &mut Z,
         _state: &mut S,
-        _event_mgr: &mut EM,
-        _observers: &mut OT,
-        _input: I,
-        _exit_kind: ExitKind,
+        _manager: &mut EM,
+        _obs: crate::fuzzer::BorrowedObservation<'_, I, OT>,
     ) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Called after the stage finished (`pre_exec` returned `None`)
-    #[inline]
-    fn deinit(
+    /// Cleanup the stage after all iterations for the current corpus item have completed.
+    fn deinit(&mut self, state: &mut S, manager: &mut EM) -> Result<(), Error>;
+}
+
+/// Alias for [`Stage`].
+pub use Stage as PushStage;
+
+/// A tuple of [`Stage`]s executed sequentially.
+pub trait StagesTuple<EM, I, OT, S> {
+    /// Initialize stages.
+    fn init_all(&mut self, state: &mut S, manager: &mut EM) -> Result<(), Error>;
+
+    /// Advance through the tuple of stages.
+    fn step_all(&mut self, state: &mut S, manager: &mut EM) -> Result<StageStep<I>, Error>;
+
+    /// Invoke `post_exec` for a specific stage by index.
+    fn post_exec_stage(
         &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _observers: &mut OT,
-    ) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-/// Allows us to use a [`PushStage`] as a normal [`Stage`]
-#[derive(Debug)]
-pub struct PushStageAdapter<CS, EM, I, OT, PS, Z> {
-    name: Cow<'static, str>,
-    push_stage: PS,
-    phantom: PhantomData<(CS, EM, I, OT, Z)>,
-}
-
-impl<CS, EM, I, OT, PS, Z> PushStageAdapter<CS, EM, I, OT, PS, Z> {
-    /// Create a new [`PushStageAdapter`], wrapping the given [`PushStage`]
-    /// to be used as a normal [`Stage`]
-    #[must_use]
-    pub fn new(push_stage: PS) -> Self {
-        // unsafe but impossible that you create two threads both instantiating this instance
-        let stage_id = unsafe {
-            let ret = PUSH_STAGE_ADAPTER_ID;
-            PUSH_STAGE_ADAPTER_ID += 1;
-            ret
-        };
-        Self {
-            name: Cow::Owned(
-                PUSH_STAGE_ADAPTER_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
-            ),
-            push_stage,
-            phantom: PhantomData,
-        }
-    }
-}
-/// The unique counter for this stage
-static mut PUSH_STAGE_ADAPTER_ID: usize = 0;
-/// The name for push stage adapter
-pub static PUSH_STAGE_ADAPTER_NAME: &str = "pushstageadapter";
-
-impl<CS, EM, I, OT, PS, Z> Named for PushStageAdapter<CS, EM, I, OT, PS, Z> {
-    fn name(&self) -> &Cow<'static, str> {
-        &self.name
-    }
-}
-
-impl<CS, EM, I, OT, PS, S, Z> Restartable<S> for PushStageAdapter<CS, EM, I, OT, PS, Z>
-where
-    S: HasMetadata + HasNamedMetadata + HasCurrentCorpusId,
-{
-    #[inline]
-    fn should_restart(&mut self, state: &mut S) -> Result<bool, Error> {
-        // TODO: Proper restart handling - call post_exec at the right time, etc...
-        RetryCountRestartHelper::no_retry(state, &self.name)
-    }
-
-    #[inline]
-    fn clear_progress(&mut self, state: &mut S) -> Result<(), Error> {
-        RetryCountRestartHelper::clear_progress(state, &self.name)
-    }
-}
-
-impl<CS, E, EM, I, OT, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<CS, EM, I, OT, PS, Z>
-where
-    CS: Scheduler<I, S>,
-    S: HasExecutions
-        + HasRand
-        + HasCorpus<I>
-        + HasLastReportTime
-        + HasCurrentCorpusId
-        + HasNamedMetadata
-        + HasMetadata,
-    E: Executor<EM, I, S, Z> + HasObservers<Observers = OT>,
-    EM: EventFirer<I, S> + EventRestarter<S> + HasEventManagerId + ProgressReporter<S>,
-    OT: ObserversTuple<I, S>,
-    PS: PushStage<EM, I, OT, S, Z>,
-    Z: ExecutesInput<E, EM, I, S>
-        + ExecutionProcessor<EM, I, OT, S>
-        + EvaluatorObservers<E, EM, I, OT>
-        + HasScheduler<I, S>,
-{
-    fn perform(
-        &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
+        stage_idx: usize,
         state: &mut S,
-        event_mgr: &mut EM,
+        manager: &mut EM,
+        obs: crate::fuzzer::BorrowedObservation<'_, I, OT>,
+    ) -> Result<(), Error>;
+
+    /// Cleanup all stages.
+    fn deinit_all(&mut self, state: &mut S, manager: &mut EM) -> Result<(), Error>;
+}
+
+/// Alias for [`StagesTuple`].
+pub use StagesTuple as PushStagesTuple;
+
+impl<EM, I, OT, S> StagesTuple<EM, I, OT, S> for () {
+    fn init_all(&mut self, _state: &mut S, _manager: &mut EM) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn step_all(&mut self, _state: &mut S, _manager: &mut EM) -> Result<StageStep<I>, Error> {
+        Ok(StageStep::Done)
+    }
+
+    fn post_exec_stage(
+        &mut self,
+        _stage_idx: usize,
+        _state: &mut S,
+        _manager: &mut EM,
+        _obs: crate::fuzzer::BorrowedObservation<'_, I, OT>,
     ) -> Result<(), Error> {
-        let push_stage = &mut self.push_stage;
+        Ok(())
+    }
 
-        let Some(corpus_id) = state.current_corpus_id()? else {
-            return Err(Error::illegal_state(
-                "state is not currently processing a corpus index",
-            ));
-        };
+    fn deinit_all(&mut self, _state: &mut S, _manager: &mut EM) -> Result<(), Error> {
+        Ok(())
+    }
+}
 
-        push_stage.set_current_corpus_id(corpus_id);
+impl<Head, Tail, EM, I, OT, S> StagesTuple<EM, I, OT, S> for (Head, Tail)
+where
+    Head: Stage<EM, I, OT, S>,
+    Tail: StagesTuple<EM, I, OT, S> + HasConstLen,
+    (Head, Tail): HasConstLen,
+    S: HasCurrentStageId + Stoppable,
+{
+    fn init_all(&mut self, state: &mut S, manager: &mut EM) -> Result<(), Error> {
+        match state.current_stage_id()? {
+            Some(idx) if idx < StageId(Self::LEN) => self.1.init_all(state, manager),
+            Some(idx) if idx == StageId(Self::LEN) => {
+                self.0.init(state, manager)?;
+                Ok(())
+            }
+            _ => {
+                state.set_current_stage_id(StageId(Self::LEN))?;
+                self.0.init(state, manager)?;
+                Ok(())
+            }
+        }
+    }
 
-        push_stage.init(fuzzer, state, event_mgr, &mut *executor.observers_mut())?;
+    fn step_all(&mut self, state: &mut S, manager: &mut EM) -> Result<StageStep<I>, Error> {
+        let current_id = state.current_stage_id()?;
 
-        loop {
-            let input =
-                match push_stage.pre_exec(fuzzer, state, event_mgr, &mut *executor.observers_mut())
-                {
-                    Some(Ok(next_input)) => next_input,
-                    Some(Err(err)) => return Err(err),
-                    None => break,
-                };
+        match current_id {
+            Some(idx) if idx == StageId(Self::LEN) => match self.0.step(state, manager)? {
+                StageStep::Execute(mut req) => {
+                    if req.tag.is_none() {
+                        req.tag = Some(crate::fuzzer::ExecutionTag::new(Self::LEN - 1, 0));
+                    }
+                    Ok(StageStep::Execute(req))
+                }
+                StageStep::Done => {
+                    self.0.deinit(state, manager)?;
+                    state.clear_stage_id()?;
+                    self.1.init_all(state, manager)?;
+                    self.1.step_all(state, manager)
+                }
+            },
+            Some(idx) if idx < StageId(Self::LEN) => self.1.step_all(state, manager),
+            _ => {
+                state.set_current_stage_id(StageId(Self::LEN))?;
+                self.0.init(state, manager)?;
+                match self.0.step(state, manager)? {
+                    StageStep::Execute(mut req) => {
+                        if req.tag.is_none() {
+                            req.tag = Some(crate::fuzzer::ExecutionTag::new(Self::LEN - 1, 0));
+                        }
+                        Ok(StageStep::Execute(req))
+                    }
+                    StageStep::Done => {
+                        self.0.deinit(state, manager)?;
+                        state.clear_stage_id()?;
+                        self.1.init_all(state, manager)?;
+                        self.1.step_all(state, manager)
+                    }
+                }
+            }
+        }
+    }
 
-            let exit_kind = fuzzer.execute_input(state, executor, event_mgr, &input)?;
+    fn post_exec_stage(
+        &mut self,
+        stage_idx: usize,
+        state: &mut S,
+        manager: &mut EM,
+        obs: crate::fuzzer::BorrowedObservation<'_, I, OT>,
+    ) -> Result<(), Error> {
+        if stage_idx == Self::LEN - 1 {
+            self.0.post_exec(state, manager, obs)
+        } else {
+            self.1.post_exec_stage(stage_idx, state, manager, obs)
+        }
+    }
 
-            push_stage.post_exec(
-                fuzzer,
-                state,
-                event_mgr,
-                &mut *executor.observers_mut(),
-                input,
-                exit_kind,
-            )?;
+    fn deinit_all(&mut self, state: &mut S, manager: &mut EM) -> Result<(), Error> {
+        self.0.deinit(state, manager)?;
+        self.1.deinit_all(state, manager)
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "std")]
+#[allow(
+    clippy::type_complexity,
+    clippy::match_wildcard_for_single_variants,
+    clippy::duration_suboptimal_units
+)]
+mod tests {
+    use alloc::vec;
+
+    use libafl_bolts::{
+        rands::StdRand,
+        tuples::{RefIndexable, tuple_list},
+    };
+
+    use super::*;
+    use crate::{
+        common::HasMetadata,
+        corpus::{Corpus, HasCurrentCorpusId, InMemoryCorpus, Testcase},
+        events::NopEventManager,
+        executors::{
+            Executor, ExitKind, HasObservers,
+            target::{DualTargetExecutor, TargetExecutor},
+        },
+        feedbacks::ConstFeedback,
+        fuzzer::{EngineStep, ExecutionMode, FuzzingEngine, StdFuzzer},
+        inputs::BytesInput,
+        mutators::{mutations::BitFlipMutator, token_mutations::AflppRedQueen},
+        observers::{StdMapObserver, map::CanTrack},
+        schedulers::{
+            IndexesLenTimeMinimizerScheduler, QueueScheduler,
+            powersched::{PowerQueueScheduler, PowerSchedule},
+        },
+        stages::push::{
+            CalibrationPushStage, MultiMutationalPushStage, StdMutationalPushStage,
+            StdPowerMutationalPushStage, TracingPushStage,
+        },
+        state::StdState,
+    };
+
+    static mut OBS_MAP: [u8; 16] = [0; 16];
+
+    #[derive(Debug)]
+    struct DummyPrimaryExecutor {
+        observers: (StdMapObserver<'static, u8, false>, ()),
+    }
+
+    impl HasObservers for DummyPrimaryExecutor {
+        type Observers = (StdMapObserver<'static, u8, false>, ());
+
+        fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+            RefIndexable::from(&self.observers)
         }
 
-        self.push_stage
-            .deinit(fuzzer, state, event_mgr, &mut *executor.observers_mut())
+        fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+            RefIndexable::from(&mut self.observers)
+        }
+    }
+
+    impl<EM, S, Z> Executor<EM, BytesInput, S, Z> for DummyPrimaryExecutor {
+        fn run_target(
+            &mut self,
+            _fuzzer: &mut Z,
+            _state: &mut S,
+            _mgr: &mut EM,
+            _input: &BytesInput,
+        ) -> Result<ExitKind, Error> {
+            Ok(ExitKind::Ok)
+        }
+    }
+
+    #[derive(Debug)]
+    struct DummySecondaryExecutor {
+        observers: (StdMapObserver<'static, u8, false>, ()),
+    }
+
+    impl HasObservers for DummySecondaryExecutor {
+        type Observers = (StdMapObserver<'static, u8, false>, ());
+
+        fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
+            RefIndexable::from(&self.observers)
+        }
+
+        fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
+            RefIndexable::from(&mut self.observers)
+        }
+    }
+
+    impl<EM, S, Z> Executor<EM, BytesInput, S, Z> for DummySecondaryExecutor {
+        fn run_target(
+            &mut self,
+            _fuzzer: &mut Z,
+            _state: &mut S,
+            _mgr: &mut EM,
+            _input: &BytesInput,
+        ) -> Result<ExitKind, Error> {
+            Ok(ExitKind::Ok)
+        }
+    }
+
+    #[test]
+    fn test_push_stages_tuple_composition() {
+        let rand = StdRand::with_seed(1234);
+        let mut corpus = InMemoryCorpus::<BytesInput>::new();
+        let testcase = Testcase::new(BytesInput::new(vec![1, 2, 3, 4]));
+        let id = corpus.add(testcase).unwrap();
+
+        let mut feedback = ConstFeedback::new(true);
+        let mut objective = ConstFeedback::new(false);
+        let mut state = StdState::new(
+            rand,
+            corpus,
+            InMemoryCorpus::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap();
+        state.set_corpus_id(id).unwrap();
+
+        let mut stages = tuple_list!(
+            CalibrationPushStage::with_runs(2),
+            StdMutationalPushStage::new(BitFlipMutator::new()),
+            TracingPushStage::new()
+        );
+        let mut mgr = NopEventManager::new();
+
+        PushStagesTuple::<NopEventManager, BytesInput, (StdMapObserver<'static, u8, false>, ()), _>::init_all(&mut stages, &mut state, &mut mgr).unwrap();
+
+        let mut step_count = 0;
+        while let StageStep::Execute(_) = PushStagesTuple::<
+            NopEventManager,
+            BytesInput,
+            (StdMapObserver<'static, u8, false>, ()),
+            _,
+        >::step_all(&mut stages, &mut state, &mut mgr)
+        .unwrap()
+        {
+            step_count += 1;
+        }
+
+        assert!(step_count >= 3);
+        PushStagesTuple::<NopEventManager, BytesInput, (StdMapObserver<'static, u8, false>, ()), _>::deinit_all(&mut stages, &mut state, &mut mgr).unwrap();
+    }
+
+    #[test]
+    fn test_push_stage_mid_stage_resumption() {
+        let rand = StdRand::with_seed(1234);
+        let mut corpus = InMemoryCorpus::<BytesInput>::new();
+        let testcase = Testcase::new(BytesInput::new(vec![1, 2, 3, 4]));
+        let id = corpus.add(testcase).unwrap();
+
+        let mut feedback = ConstFeedback::new(true);
+        let mut objective = ConstFeedback::new(false);
+        let mut state = StdState::new(
+            rand,
+            corpus,
+            InMemoryCorpus::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap();
+        state.set_corpus_id(id).unwrap();
+
+        let mut stages = tuple_list!(CalibrationPushStage::with_runs(2), TracingPushStage::new());
+        let mut mgr = NopEventManager::new();
+
+        PushStagesTuple::<NopEventManager, BytesInput, (StdMapObserver<'static, u8, false>, ()), _>::init_all(&mut stages, &mut state, &mut mgr).unwrap();
+
+        // Execute stage 1 (Calibration)
+        let step1 = PushStagesTuple::<
+            NopEventManager,
+            BytesInput,
+            (StdMapObserver<'static, u8, false>, ()),
+            _,
+        >::step_all(&mut stages, &mut state, &mut mgr)
+        .unwrap();
+        assert!(matches!(step1, StageStep::Execute(_)));
+
+        // Simulate resume: stage_id remains valid
+        let current_stage = state.current_stage_id().unwrap();
+        assert!(current_stage.is_some());
+
+        // Re-initialize stages under resumption
+        PushStagesTuple::<NopEventManager, BytesInput, (StdMapObserver<'static, u8, false>, ()), _>::init_all(&mut stages, &mut state, &mut mgr).unwrap();
+        let step2 = PushStagesTuple::<
+            NopEventManager,
+            BytesInput,
+            (StdMapObserver<'static, u8, false>, ()),
+            _,
+        >::step_all(&mut stages, &mut state, &mut mgr)
+        .unwrap();
+        assert!(matches!(step2, StageStep::Execute(_) | StageStep::Done));
+
+        PushStagesTuple::<NopEventManager, BytesInput, (StdMapObserver<'static, u8, false>, ()), _>::deinit_all(&mut stages, &mut state, &mut mgr).unwrap();
+    }
+
+    #[test]
+    fn test_push_engine_with_various_schedulers() {
+        // 1. QueueScheduler
+        {
+            let rand = StdRand::with_seed(100);
+            let mut corpus = InMemoryCorpus::<BytesInput>::new();
+            let id = corpus
+                .add(Testcase::new(BytesInput::new(vec![1, 2])))
+                .unwrap();
+            let mut fb = ConstFeedback::new(true);
+            let mut obj = ConstFeedback::new(false);
+            let mut state =
+                StdState::new(rand, corpus, InMemoryCorpus::new(), &mut fb, &mut obj).unwrap();
+            let mut scheduler = QueueScheduler::new();
+            crate::schedulers::Scheduler::on_add(&mut scheduler, &mut state, id).unwrap();
+
+            let stages = tuple_list!(CalibrationPushStage::with_runs(1));
+            let mut engine = StdFuzzer::new(scheduler, fb, obj, stages);
+            let mut mgr = NopEventManager::new();
+            let res: EngineStep<BytesInput> = FuzzingEngine::<
+                NopEventManager,
+                BytesInput,
+                (StdMapObserver<'static, u8, false>, ()),
+                _,
+            >::step(&mut engine, &mut state, &mut mgr)
+            .unwrap();
+            assert!(matches!(res, EngineStep::Execute(_)));
+        }
+
+        // 2. WeightedScheduler / PowerQueueScheduler
+        {
+            let map_ptr = &raw mut OBS_MAP as *mut u8;
+            let observer = unsafe { StdMapObserver::from_mut_ptr("sched_cov1", map_ptr, 16) };
+            let rand = StdRand::with_seed(101);
+            let mut corpus = InMemoryCorpus::<BytesInput>::new();
+            let mut tc = Testcase::new(BytesInput::new(vec![3, 4]));
+            *tc.exec_time_mut() = Some(core::time::Duration::from_millis(10));
+            let id = corpus.add(tc).unwrap();
+            let mut fb = ConstFeedback::new(true);
+            let mut obj = ConstFeedback::new(false);
+            let mut state =
+                StdState::new(rand, corpus, InMemoryCorpus::new(), &mut fb, &mut obj).unwrap();
+            let mut scheduler =
+                PowerQueueScheduler::new(&mut state, &observer, PowerSchedule::fast());
+            crate::schedulers::Scheduler::on_add(&mut scheduler, &mut state, id).unwrap();
+
+            let stages = tuple_list!(StdPowerMutationalPushStage::new(BitFlipMutator::new()));
+            let mut engine = StdFuzzer::new(scheduler, fb, obj, stages);
+            let mut mgr = NopEventManager::new();
+            let res: EngineStep<BytesInput> = FuzzingEngine::<
+                NopEventManager,
+                BytesInput,
+                (StdMapObserver<'static, u8, false>, ()),
+                _,
+            >::step(&mut engine, &mut state, &mut mgr)
+            .unwrap();
+            assert!(matches!(res, EngineStep::Execute(_)));
+        }
+
+        // 3. MinimizerScheduler
+        {
+            let map_ptr = &raw mut OBS_MAP as *mut u8;
+            let observer =
+                unsafe { StdMapObserver::from_mut_ptr("sched_cov2", map_ptr, 16) }.track_indices();
+            let rand = StdRand::with_seed(102);
+            let mut corpus = InMemoryCorpus::<BytesInput>::new();
+            let mut tc = Testcase::new(BytesInput::new(vec![5, 6]));
+            tc.add_metadata(crate::feedbacks::MapIndexesMetadata::new(vec![0]));
+            *tc.exec_time_mut() = Some(core::time::Duration::from_millis(10));
+            let id = corpus.add(tc).unwrap();
+            let mut fb = ConstFeedback::new(true);
+            let mut obj = ConstFeedback::new(false);
+            let mut state =
+                StdState::new(rand, corpus, InMemoryCorpus::new(), &mut fb, &mut obj).unwrap();
+            let mut scheduler =
+                IndexesLenTimeMinimizerScheduler::new(&observer, QueueScheduler::new());
+            crate::schedulers::Scheduler::on_add(&mut scheduler, &mut state, id).unwrap();
+
+            let stages = tuple_list!(CalibrationPushStage::with_runs(1));
+            let mut engine = StdFuzzer::new(scheduler, fb, obj, stages);
+            let mut mgr = NopEventManager::new();
+            let res: EngineStep<BytesInput> = FuzzingEngine::<
+                NopEventManager,
+                BytesInput,
+                (StdMapObserver<'static, u8, false>, ()),
+                _,
+            >::step(&mut engine, &mut state, &mut mgr)
+            .unwrap();
+            assert!(matches!(res, EngineStep::Execute(_)));
+        }
+
+        // 4. ProbabilitySamplingScheduler
+        {
+            #[derive(Debug, Clone)]
+            struct UniformDistribution;
+            impl<I, S> crate::schedulers::TestcaseScore<I, S> for UniformDistribution
+            where
+                S: crate::state::HasCorpus<I>,
+            {
+                fn compute(_state: &S, _: &mut Testcase<I>) -> Result<f64, Error> {
+                    Ok(1.0)
+                }
+            }
+
+            let rand = StdRand::with_seed(103);
+            let mut corpus = InMemoryCorpus::<BytesInput>::new();
+            let tc = Testcase::new(BytesInput::new(vec![7, 8]));
+            let id = corpus.add(tc).unwrap();
+            let mut fb = ConstFeedback::new(true);
+            let mut obj = ConstFeedback::new(false);
+            let mut state =
+                StdState::new(rand, corpus, InMemoryCorpus::new(), &mut fb, &mut obj).unwrap();
+            let mut scheduler =
+                crate::schedulers::ProbabilitySamplingScheduler::<UniformDistribution>::new();
+            crate::schedulers::Scheduler::on_add(&mut scheduler, &mut state, id).unwrap();
+
+            let stages = tuple_list!(CalibrationPushStage::with_runs(1));
+            let mut engine = StdFuzzer::new(scheduler, fb, obj, stages);
+            let mut mgr = NopEventManager::new();
+            let res: EngineStep<BytesInput> = FuzzingEngine::<
+                NopEventManager,
+                BytesInput,
+                (StdMapObserver<'static, u8, false>, ()),
+                _,
+            >::step(&mut engine, &mut state, &mut mgr)
+            .unwrap();
+            assert!(matches!(res, EngineStep::Execute(_)));
+        }
+    }
+
+    #[test]
+    fn test_cmplog_push_stage_pipelining_with_dual_executor() {
+        let rand = StdRand::with_seed(999);
+        let mut corpus = InMemoryCorpus::<BytesInput>::new();
+        let testcase = Testcase::new(BytesInput::new(vec![0x10, 0x20]));
+        let id = corpus.add(testcase).unwrap();
+
+        let mut feedback = ConstFeedback::new(true);
+        let mut objective = ConstFeedback::new(false);
+
+        let mut state = StdState::new(
+            rand,
+            corpus,
+            InMemoryCorpus::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap();
+
+        let mut scheduler = QueueScheduler::new();
+        crate::schedulers::Scheduler::on_add(&mut scheduler, &mut state, id).unwrap();
+
+        let map_ptr = &raw mut OBS_MAP as *mut u8;
+        let primary_obs = unsafe { StdMapObserver::from_mut_ptr("primary_cov", map_ptr, 16) };
+        let secondary_obs = unsafe { StdMapObserver::from_mut_ptr("cmplog_cov", map_ptr, 16) };
+
+        let primary_exec = DummyPrimaryExecutor {
+            observers: (primary_obs, ()),
+        };
+        let secondary_exec = DummySecondaryExecutor {
+            observers: (secondary_obs, ()),
+        };
+        let mut dual_exec = DualTargetExecutor::new(
+            crate::executors::target::StdTargetExecutor::new(primary_exec),
+            crate::executors::target::StdTargetExecutor::new(secondary_exec),
+            ExecutionMode::CmpLog,
+        );
+
+        let cmplog_stage = AflppCmplogTracingPushStage::new();
+        let redqueen_stage =
+            MultiMutationalPushStage::new(AflppRedQueen::with_cmplog_options(true, true));
+        let stages = tuple_list!(cmplog_stage, redqueen_stage);
+
+        let mut engine = StdFuzzer::new(scheduler, feedback, objective, stages);
+        let mut mgr = NopEventManager::new();
+
+        for _ in 0..5 {
+            match FuzzingEngine::<
+                NopEventManager,
+                BytesInput,
+                (StdMapObserver<'static, u8, false>, ()),
+                _,
+            >::step(&mut engine, &mut state, &mut mgr)
+            .unwrap()
+            {
+                EngineStep::Execute(req) => {
+                    let res = dual_exec.execute_request(&req).unwrap();
+                    engine
+                        .report_observations(&mut state, &mut mgr, res)
+                        .unwrap();
+                }
+                EngineStep::Progress => {}
+                EngineStep::Completed => break,
+            }
+        }
+
+        assert!(*crate::state::HasExecutions::executions(&state) > 0);
+    }
+
+    #[test]
+    fn test_push_stage_adapter_and_zero_overhead_restart() {
+        use crate::common::HasNamedMetadata;
+
+        let rand = StdRand::with_seed(1234);
+        let mut corpus = InMemoryCorpus::<BytesInput>::new();
+        let testcase = Testcase::new(BytesInput::new(vec![1, 2, 3, 4]));
+        let id = corpus.add(testcase).unwrap();
+
+        let mut feedback = ConstFeedback::new(true);
+        let mut objective = ConstFeedback::new(false);
+        let mut state = StdState::new(
+            rand,
+            corpus,
+            InMemoryCorpus::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap();
+        state.set_corpus_id(id).unwrap();
+
+        let mut mgr = NopEventManager::new();
+        let mut stage = StdMutationalPushStage::new(BitFlipMutator::new());
+        PushStage::<NopEventManager, BytesInput, (), _>::init(&mut stage, &mut state, &mut mgr)
+            .unwrap();
+
+        // Advance 2 steps before a simulated crash/restart
+        let step1 =
+            PushStage::<NopEventManager, BytesInput, (), _>::step(&mut stage, &mut state, &mut mgr)
+                .unwrap();
+        assert!(matches!(step1, StageStep::Execute(_)));
+        let step2 =
+            PushStage::<NopEventManager, BytesInput, (), _>::step(&mut stage, &mut state, &mut mgr)
+                .unwrap();
+        assert!(matches!(step2, StageStep::Execute(_)));
+
+        // Verify progress metadata stored in state reflects exact progress
+        let meta = state
+            .named_metadata_map()
+            .get::<StageProgressMetadata>(stage.name())
+            .unwrap();
+        let done_before_restart = meta.testcases_done;
+        let to_do = meta.testcases_to_do;
+        assert_eq!(done_before_restart, 2);
+
+        // Simulate restart: create a fresh stage instance and call init() against restored state
+        let mut restarted_stage = StdMutationalPushStage::new(BitFlipMutator::new());
+        PushStage::<NopEventManager, BytesInput, (), _>::init(
+            &mut restarted_stage,
+            &mut state,
+            &mut mgr,
+        )
+        .unwrap();
+
+        let step3 = PushStage::<NopEventManager, BytesInput, (), _>::step(
+            &mut restarted_stage,
+            &mut state,
+            &mut mgr,
+        )
+        .unwrap();
+        assert!(matches!(step3, StageStep::Execute(_)));
+        let meta_after = state
+            .named_metadata_map()
+            .get::<StageProgressMetadata>(restarted_stage.name())
+            .unwrap();
+        // Resumed immediately at iteration 3 without re-executing iterations 1 or 2!
+        assert_eq!(meta_after.testcases_done, done_before_restart + 1);
+        assert_eq!(meta_after.testcases_to_do, to_do);
     }
 }

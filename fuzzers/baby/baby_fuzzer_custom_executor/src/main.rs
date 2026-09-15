@@ -1,7 +1,4 @@
 use std::{marker::PhantomData, path::PathBuf, ptr::write};
-
-#[cfg(feature = "bloom_input_filter")]
-use libafl::fuzzer::{BloomInputFilter, ReportingInputFilter};
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
@@ -12,14 +9,14 @@ use libafl::{
     executors::{Executor, ExitKind, WithObservers},
     feedback_and_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     generators::RandPrintablesGenerator,
     inputs::HasTargetBytes,
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
     observers::ConstMapObserver,
     schedulers::QueueScheduler,
-    stages::{mutational::StdMutationalStage, AflStatsStage, CalibrationStage},
-    state::{HasCorpus, HasExecutions, StdState},
+    stages::{CalibrationStage, StdMutationalStage},
+    state::{HasExecutions, StdState},
 };
 use libafl_bolts::{current_nanos, nonnull_raw_mut, nonzero, rands::StdRand, tuples::tuple_list};
 /// Coverage map with explicit assignments due to the lack of instrumentation
@@ -46,8 +43,8 @@ impl<S> CustomExecutor<S> {
 
 impl<EM, I, S, Z> Executor<EM, I, S, Z> for CustomExecutor<S>
 where
-    S: HasCorpus<I> + HasExecutions,
     I: HasTargetBytes,
+    S: HasExecutions,
 {
     fn run_target(
         &mut self,
@@ -55,8 +52,7 @@ where
         state: &mut S,
         _mgr: &mut EM,
         input: &I,
-    ) -> Result<ExitKind, libafl::Error> {
-        // We need to keep track of the exec count.
+    ) -> Result<ExitKind, libafl_bolts::Error> {
         *state.executions_mut() += 1;
 
         let target = input.target_bytes();
@@ -81,12 +77,6 @@ pub fn main() {
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
-
-    let calibration_stage = CalibrationStage::new(&feedback);
-    let stats_stage = AflStatsStage::builder()
-        .map_feedback(&feedback)
-        .build()
-        .unwrap();
 
     // A feedback to choose if an input is a solution or not
     let mut objective = feedback_and_fast!(
@@ -128,44 +118,36 @@ pub fn main() {
     // such as the notification of the addition of a new item to the corpus
     let mut mgr = SimpleEventManager::new(mon);
 
-    // A queue policy to get testcasess from the corpus
+    // A queue policy to get testcases from the corpus
     let scheduler = QueueScheduler::new();
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    #[cfg(not(feature = "bloom_input_filter"))]
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-    #[cfg(feature = "bloom_input_filter")]
-    let filter = ReportingInputFilter::new(BloomInputFilter::new(10_000_000, 0.001), 100_000);
-    #[cfg(feature = "bloom_input_filter")]
-    let mut fuzzer = StdFuzzer::builder()
-        .input_filter(filter)
-        .scheduler(scheduler)
-        .feedback(feedback)
-        .objective(objective)
-        .build();
+    // Setup stages
+    let calibration_stage = CalibrationStage::new();
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
+    let mutational_stage = StdMutationalStage::new(mutator);
+    let stages = tuple_list!(calibration_stage, mutational_stage);
 
-    // Create the executor for an in-process function with just one observer
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
+
+    // Create the executor with observer
     let executor = CustomExecutor::new(&state);
-
-    let mut executor = WithObservers::new(executor, tuple_list!(observer));
+    let mut with_obs = WithObservers::new(executor, tuple_list!(observer));
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::with_min_size(nonzero!(1), nonzero!(32));
 
     // Generate 8 initial inputs
-    state
-        .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
+    fuzzer
+        .generate_initial_inputs_with_executor(
+            &mut with_obs,
+            &mut generator,
+            &mut state,
+            &mut mgr,
+            8,
+        )
         .expect("Failed to generate the initial corpus");
 
-    // Setup a mutational stage with a basic bytes mutator
-    let mutator = HavocScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(
-        calibration_stage,
-        StdMutationalStage::new(mutator),
-        stats_stage
-    );
-
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut with_obs, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 }

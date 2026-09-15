@@ -6,7 +6,7 @@ use std::{env, fmt::Write, io, path::PathBuf, process, ptr::NonNull};
 
 use clap::{builder::Str, Parser};
 use libafl::{
-    corpus::{Corpus, CorpusId, HasCurrentCorpusId, InMemoryCorpus, InMemoryOnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, InMemoryOnDiskCorpus},
     events::{SendExiting, SimpleRestartingEventManager},
     executors::ExitKind,
     feedbacks::MaxMapFeedback,
@@ -16,7 +16,7 @@ use libafl::{
     mutators::{havoc_mutations, HavocScheduledMutator},
     observers::{ConstMapObserver, HitcountsMapObserver},
     schedulers::QueueScheduler,
-    stages::{ObserverEqualityFactory, StagesTuple, StdTMinMutationalStage},
+    stages::{ObserverEqualityFactory, StdTMinMutationalStage},
     state::{HasCorpus, StdState},
     Error,
 };
@@ -257,26 +257,20 @@ pub fn fuzz() -> Result<(), Error> {
             },
         };
 
+    let minimizer = HavocScheduledMutator::new(havoc_mutations());
+    let factory = ObserverEqualityFactory::new(&edges_observer);
+    let stages = tuple_list!(StdTMinMutationalStage::new(
+        minimizer,
+        factory,
+        options.iterations
+    ));
+
     // Our fuzzer is a simple queue scheduler (FIFO), and has no corpus feedback
     // or objective feedback. This is important as we need the MaxMapFeedback
     // on the observer to be constrained by ObserverEqualityFactory which will
     // ensure interestingness is only true for identical coverage.
     let scheduler = QueueScheduler::new();
-    let mut fuzzer = StdFuzzer::new(scheduler, (), ());
-
-    // We define the stages that will be performed by the fuzzer. We have one
-    // stage of the StdTMinMutationalStage which will run for n iterations.
-    // The havoc mutator will generate mutations; only those shorter than the
-    // current input will be tested; and the ObservreEqualityFactory will
-    // provide an observer that ensures additions to the corpus have the same
-    // coverage.
-    let minimizer = HavocScheduledMutator::new(havoc_mutations());
-    let factory = ObserverEqualityFactory::new(&edges_observer);
-    let mut stages = tuple_list!(StdTMinMutationalStage::new(
-        minimizer,
-        factory,
-        options.iterations
-    ),);
+    let mut fuzzer = StdFuzzer::new(scheduler, (), (), stages);
 
     // Create a state instance. Unlike a typical fuzzer, we start with an empty
     // input corpus, and we don't care about 'solutions' so store in an
@@ -310,10 +304,9 @@ pub fn fuzz() -> Result<(), Error> {
     log::info!("Processed {} inputs from disk.", files.len());
 
     // Iterate over initial corpus_ids and minimize each.
-    let corpus_ids: Vec<CorpusId> = state.corpus().ids().collect();
-    for corpus_id in corpus_ids {
-        state.set_corpus_id(corpus_id)?;
-        stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr)?;
+    let corpus_count = state.corpus().count();
+    for _ in 0..corpus_count {
+        fuzzer.fuzz_one(&mut executor, &mut state, &mut mgr)?;
     }
 
     // We end up with equivalent output corpus, hopefully smaller than the

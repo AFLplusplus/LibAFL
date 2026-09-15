@@ -254,7 +254,10 @@ impl<'a, EM, H, OT, S, Z> InProcessExecutorBuilder<&'a mut EM, &'a mut Z, H, OT,
     where
         H: FnMut(&I) -> ExitKind + Sized,
         OT: ObserversTuple<I, S>,
-        S: HasCurrentTestcase<I> + HasExecutions + HasSolutions<I>,
+        S: HasCurrentTestcase<I>
+            + HasExecutions
+            + HasSolutions<I>
+            + crate::state::HasInFlightExecutions<I>,
         I: Input,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
@@ -446,7 +449,10 @@ impl<'a, EM, HB, HT, OT, S, Z>
         HB: FnMut(&I) -> ExitKind + Sized,
         HT: ExecutorHooksTuple<I, S>,
         OT: ObserversTuple<I, S>,
-        S: HasCurrentTestcase<I> + HasExecutions + HasSolutions<I>,
+        S: HasCurrentTestcase<I>
+            + HasExecutions
+            + HasSolutions<I>
+            + crate::state::HasInFlightExecutions<I>,
         I: Input,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
@@ -465,7 +471,10 @@ impl<'a, EM, HB, HT, OT, S, Z>
         HB: BorrowMut<H>,
         HT: ExecutorHooksTuple<I, S>,
         OT: ObserversTuple<I, S>,
-        S: HasCurrentTestcase<I> + HasExecutions + HasSolutions<I>,
+        S: HasCurrentTestcase<I>
+            + HasExecutions
+            + HasSolutions<I>
+            + crate::state::HasInFlightExecutions<I>,
         I: Input,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
@@ -512,7 +521,10 @@ impl<EM, H, I, OT, S, Z> InProcessExecutor<EM, H, I, OT, S, Z>
 where
     H: FnMut(&I) -> ExitKind + Sized,
     OT: ObserversTuple<I, S>,
-    S: HasCurrentTestcase<I> + HasExecutions + HasSolutions<I>,
+    S: HasCurrentTestcase<I>
+        + HasExecutions
+        + HasSolutions<I>
+        + crate::state::HasInFlightExecutions<I>,
     I: Input,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -577,7 +589,10 @@ where
     HB: BorrowMut<H>,
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasCurrentTestcase<I> + HasExecutions + HasSolutions<I>,
+    S: HasCurrentTestcase<I>
+        + HasExecutions
+        + HasSolutions<I>
+        + crate::state::HasInFlightExecutions<I>,
     I: Input,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -644,21 +659,33 @@ where
             .event_mgr(event_mgr)
             .build_custom::<H, I, OF>()
     }
+}
 
+impl<EM, H, HB, HT, I, OT, S, Z> GenericInProcessExecutor<EM, H, HB, HT, I, OT, S, Z>
+where
+    HB: core::borrow::Borrow<H>,
+{
     /// Retrieve the harness function.
     #[inline]
     #[must_use]
     pub fn harness(&self) -> &H {
         self.harness_fn.borrow()
     }
+}
 
+impl<EM, H, HB, HT, I, OT, S, Z> GenericInProcessExecutor<EM, H, HB, HT, I, OT, S, Z>
+where
+    HB: BorrowMut<H>,
+{
     /// Retrieve the harness function for a mutable reference.
     #[inline]
     #[must_use]
     pub fn harness_mut(&mut self) -> &mut H {
         self.harness_fn.borrow_mut()
     }
+}
 
+impl<EM, H, HB, HT, I, OT, S, Z> GenericInProcessExecutor<EM, H, HB, HT, I, OT, S, Z> {
     /// The inprocess handlers
     #[inline]
     #[must_use]
@@ -716,7 +743,11 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
     E::Observers: ObserversTuple<I, S>,
     EM: EventFirer<I, S> + EventRestarter<S>,
     OF: Feedback<EM, I, E::Observers, S>,
-    S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
+    S: HasExecutions
+        + HasSolutions<I>
+        + HasCorpus<I>
+        + HasCurrentTestcase<I>
+        + crate::state::HasInFlightExecutions<I>,
     Z: HasObjective<Objective = OF>,
     I: Input + Clone,
 {
@@ -763,6 +794,10 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
             .expect("Could not send off events in run_observers_and_save_state");
     }
 
+    state.set_pending_exit_kind(Some(exitkind));
+    state.set_pending_exec_time(observers.last_runtime_all());
+    state.mark_in_flight_input_completed();
+
     // Serialize the state and wait safely for the broker to read pending messages
     event_mgr.on_restart(state).unwrap();
 }
@@ -787,6 +822,9 @@ mod tests {
     #[test]
     #[cfg_attr(feature = "std", serial)]
     fn test_inmem_exec() {
+        let _inproc_guard = crate::INPROCESS_TEST_MUTEX
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
         let rand = XkcdRand::new();
         let corpus = InMemoryCorpus::<NopInput>::new();
@@ -797,7 +835,7 @@ mod tests {
         let mut mgr = NopEventManager::new();
         let mut state =
             StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
-        let mut fuzzer = StdFuzzer::new(sche, feedback, objective);
+        let mut fuzzer = StdFuzzer::new(sche, feedback, objective, ());
 
         let mut in_process_executor = InProcessExecutor::builder()
             .harness(&mut harness)

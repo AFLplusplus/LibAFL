@@ -12,7 +12,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
@@ -113,8 +113,23 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    // Setup a tracing stage in which we log comparisons
+    let tracing = ShadowTracingStage::new();
+
+    // Setup a randomic Input2State stage
+    let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+        I2SRandReplace::new()
+    )));
+
+    // Setup a basic mutator
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
+    let mutational = StdMutationalStage::new(mutator);
+
+    // The order of the stages matter!
+    let stages = tuple_list!(tracing, i2s, mutational);
+
+    // A fuzzer with feedbacks, a corpus scheduler, and stages
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
@@ -128,13 +143,13 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // Create the executor for an in-process function with just one observer for edge coverage
     let mut executor = ShadowExecutor::new(
-        InProcessExecutor::new(
-            &mut harness,
-            tuple_list!(edges_observer, time_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut restarting_mgr,
-        )?,
+        InProcessExecutor::builder()
+            .harness(&mut harness)
+            .observers(tuple_list!(edges_observer, time_observer))
+            .fuzzer(&mut fuzzer)
+            .state(&mut state)
+            .event_mgr(&mut restarting_mgr)
+            .build()?,
         tuple_list!(cmplog_observer),
     );
 
@@ -155,22 +170,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    // Setup a tracing stage in which we log comparisons
-    let tracing = ShadowTracingStage::new();
-
-    // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
-        I2SRandReplace::new()
-    )));
-
-    // Setup a basic mutator
-    let mutator = HavocScheduledMutator::new(havoc_mutations());
-    let mutational = StdMutationalStage::new(mutator);
-
-    // The order of the stages matter!
-    let mut stages = tuple_list!(tracing, i2s, mutational);
-
-    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
+    fuzzer.fuzz_loop(&mut executor, &mut state, &mut restarting_mgr)?;
 
     // Never reached
     Ok(())

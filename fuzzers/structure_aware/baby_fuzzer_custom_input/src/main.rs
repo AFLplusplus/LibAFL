@@ -17,12 +17,12 @@ use libafl::{
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     monitors::SimpleMonitor,
     mutators::scheduled::HavocScheduledMutator,
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::mutational::StdMutationalStage,
+    stages::StdMutationalStage,
     state::StdState,
 };
 use libafl_bolts::{
@@ -122,27 +122,6 @@ pub fn main() {
 
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueScheduler::new();
-
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
-    // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
-        &mut harness,
-        tuple_list!(observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the Executor");
-
-    // Generator of printable bytearrays of max size 32
-    let mut generator = CustomInputGenerator::new(nonzero!(1));
-
-    // Generate 8 initial inputs
-    state
-        .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
-        .expect("Failed to generate the initial corpus");
 
     #[cfg(feature = "simple_interface")]
     let (
@@ -264,10 +243,36 @@ pub fn main() {
     // Scheduling layer for the mutations
     let mutator_scheduler = HavocScheduledMutator::new(mutators);
     // Defining the mutator stage
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator_scheduler));
+    let stages = tuple_list!(StdMutationalStage::new(mutator_scheduler));
+
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
+
+    // Create the executor for an in-process function with just one observer
+    let mut executor = InProcessExecutor::builder()
+        .harness(&mut harness)
+        .observers(tuple_list!(observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()
+        .expect("Failed to create the Executor");
+
+    // Generator of printable bytearrays of max size 32
+    let mut generator = CustomInputGenerator::new(nonzero!(1));
+
+    // Generate 8 initial inputs
+    fuzzer
+        .generate_initial_inputs_with_executor(
+            &mut executor,
+            &mut generator,
+            &mut state,
+            &mut mgr,
+            8,
+        )
+        .expect("Failed to generate the initial corpus");
 
     // Run the fuzzer
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 }

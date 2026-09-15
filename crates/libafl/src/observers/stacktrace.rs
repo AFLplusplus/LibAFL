@@ -111,7 +111,7 @@ pub enum HarnessType {
 }
 
 /// An observer looking at the backtrace after the harness crashes
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BacktraceObserver<'a> {
     observer_name: Cow<'static, str>,
     hash: OwnedRefMut<'a, Option<u64>>,

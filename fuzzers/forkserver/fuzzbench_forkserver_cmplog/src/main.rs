@@ -17,7 +17,7 @@ use libafl::{
     },
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{
@@ -28,8 +28,8 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, mutational::MultiMutationalStage,
-        power::StdPowerMutationalStage, ColorizationStage, IfStage,
+        CalibrationStage, ColorizationStage, IfStage, MultiMutationalStage,
+        StdPowerMutationalStage,
     },
     state::{HasCorpus, HasCurrentTestcase, StdState},
     Error, HasMetadata,
@@ -263,7 +263,7 @@ fn fuzz(
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
-    let calibration = CalibrationStage::new(&map_feedback);
+    let calibration = CalibrationStage::new();
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
@@ -304,8 +304,7 @@ fn fuzz(
         5,
     )?;
 
-    let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
-        StdPowerMutationalStage::new(mutator);
+    let power = StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
@@ -318,7 +317,7 @@ fn fuzz(
     );
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::without_stages(scheduler, feedback, objective);
 
     let colorization = ColorizationStage::new(&edges_observer);
     let mut tokens = Tokens::new();
@@ -384,12 +383,9 @@ fn fuzz(
         let tracing = AflppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
 
         // Setup a randomic Input2State stage
-        let rq: MultiMutationalStage<_, _, BytesInput, _, _, _> =
-            MultiMutationalStage::new(AflppRedQueen::with_cmplog_options(true, true));
+        let rq = MultiMutationalStage::new(AflppRedQueen::with_cmplog_options(true, true));
 
-        let cb = |_fuzzer: &mut _,
-                  _executor: &mut _,
-                  state: &mut StdState<InMemoryOnDiskCorpus<_>, _, _, _>,
+        let cb = |state: &mut StdState<InMemoryOnDiskCorpus<_>, _, _, _>,
                   _event_manager: &mut _|
          -> Result<bool, Error> {
             let testcase = state.current_testcase()?;
@@ -401,14 +397,16 @@ fn fuzz(
         let cmplog = IfStage::new(cb, tuple_list!(colorization, tracing, rq));
 
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, cmplog, power);
+        let stages = tuple_list!(calibration, cmplog, power);
+        let mut fuzzer = fuzzer.with_stages(stages);
 
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        fuzzer.fuzz_loop(&mut executor, &mut state, &mut mgr)?;
     } else {
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, power);
+        let stages = tuple_list!(calibration, power);
+        let mut fuzzer = fuzzer.with_stages(stages);
 
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        fuzzer.fuzz_loop(&mut executor, &mut state, &mut mgr)?;
     }
 
     // Never reached

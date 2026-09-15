@@ -8,12 +8,13 @@ use libafl::executors::inprocess::InProcessExecutor;
 #[cfg(unix)]
 use libafl::executors::inprocess_fork::InProcessForkExecutor;
 use libafl::{
-    Error, ExecutesInput, Fuzzer, StdFuzzer,
+    Error, ExecutesInput, StdFuzzer,
     corpus::{Corpus, HasTestcase, InMemoryCorpus, Testcase},
     events::SimpleEventManager,
     executors::ExitKind,
-    feedbacks::{CrashFeedback, TimeoutFeedback},
+    feedbacks::{CrashFeedback, Feedback, FeedbackFactory, TimeoutFeedback},
     inputs::{BytesInput, HasMutatorBytes, HasTargetBytes},
+    monitors::SimplePrintingMonitor,
     mutators::{HavocScheduledMutator, Mutator, havoc_mutations_no_crossover},
     schedulers::QueueScheduler,
     stages::StdTMinMutationalStage,
@@ -31,6 +32,64 @@ use libafl_targets::LLVMCustomMutator;
 use crate::{CustomMutationStatus, options::LibfuzzerOptions};
 type TMinState =
     StdState<InMemoryCorpus<BytesInput>, BytesInput, RomuDuoJrRand, InMemoryCorpus<BytesInput>>;
+
+fn run_tmin_stage<M, F, FF>(
+    mutator: M,
+    factory: FF,
+    options: &LibfuzzerOptions,
+    harness: &mut impl FnMut(&BytesInput) -> ExitKind,
+    state: &mut TMinState,
+    mgr: &mut SimpleEventManager<BytesInput, SimplePrintingMonitor, TMinState>,
+) -> Result<(), Error>
+where
+    M: Mutator<BytesInput, TMinState>,
+    F: Feedback<
+            SimpleEventManager<BytesInput, SimplePrintingMonitor, TMinState>,
+            BytesInput,
+            (),
+            TMinState,
+        >,
+    FF: FeedbackFactory<F, ()>,
+{
+    let tmin = StdTMinMutationalStage::new(
+        mutator,
+        factory,
+        if options.runs() == 0 {
+            128
+        } else {
+            options.runs()
+        },
+    );
+    let mut fuzzer = StdFuzzer::new(QueueScheduler::new(), (), (), tuple_list!(tmin));
+
+    #[cfg(unix)]
+    let mut executor = {
+        let shmem_provider = StdShMemProvider::new()?;
+        InProcessForkExecutor::new(
+            harness,
+            (),
+            &mut fuzzer,
+            state,
+            mgr,
+            options.timeout(),
+            shmem_provider,
+        )?
+    };
+
+    #[cfg(windows)]
+    let mut executor = InProcessExecutor::builder()
+        .timeout(options.timeout())
+        .crashdump(false)
+        .harness(harness)
+        .observers(())
+        .fuzzer(&mut fuzzer)
+        .state(state)
+        .event_mgr(mgr)
+        .build()?;
+
+    fuzzer.fuzz_one(&mut executor, state, mgr)?;
+    Ok(())
+}
 
 fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
     options: &LibfuzzerOptions,
@@ -63,66 +122,60 @@ fn minimize_crash_with_mutator<M: Mutator<BytesInput, TMinState>>(
         }
     };
 
-    let mut fuzzer = StdFuzzer::new(QueueScheduler::new(), (), ());
+    let mut fuzzer = StdFuzzer::new(QueueScheduler::new(), (), (), ());
 
-    #[cfg(unix)]
-    let mut executor = {
-        let shmem_provider = StdShMemProvider::new()?;
-        InProcessForkExecutor::new(
-            &mut harness,
-            (),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-            options.timeout(),
-            shmem_provider,
-        )?
+    let exit_kind = {
+        #[cfg(unix)]
+        let mut executor = {
+            let shmem_provider = StdShMemProvider::new()?;
+            InProcessForkExecutor::new(
+                &mut harness,
+                (),
+                &mut fuzzer,
+                &mut state,
+                &mut mgr,
+                options.timeout(),
+                shmem_provider,
+            )?
+        };
+
+        #[cfg(windows)]
+        let mut executor = InProcessExecutor::builder()
+            .timeout(options.timeout())
+            .crashdump(false)
+            .harness(&mut harness)
+            .observers(())
+            .fuzzer(&mut fuzzer)
+            .state(&mut state)
+            .event_mgr(&mut mgr)
+            .build()?;
+
+        fuzzer.execute_input(&mut state, &mut executor, &mut mgr, &input)?
     };
-
-    #[cfg(windows)]
-    let mut executor = InProcessExecutor::builder()
-        .timeout(options.timeout())
-        .crashdump(false)
-        .harness(&mut harness)
-        .observers(())
-        .fuzzer(&mut fuzzer)
-        .state(&mut state)
-        .event_mgr(&mut mgr)
-        .build()?;
-
-    let exit_kind = fuzzer.execute_input(&mut state, &mut executor, &mut mgr, &input)?;
 
     let size = input.len();
     let id = state.corpus_mut().add(Testcase::new(input))?;
 
     match exit_kind {
         ExitKind::Crash => {
-            let factory = CrashFeedback::new();
-            let tmin = StdTMinMutationalStage::new(
+            run_tmin_stage(
                 mutator,
-                factory,
-                if options.runs() == 0 {
-                    128
-                } else {
-                    options.runs()
-                },
-            );
-            let mut stages = tuple_list!(tmin);
-            fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                CrashFeedback::new(),
+                options,
+                &mut harness,
+                &mut state,
+                &mut mgr,
+            )?;
         }
         ExitKind::Timeout => {
-            let factory = TimeoutFeedback::new();
-            let tmin = StdTMinMutationalStage::new(
+            run_tmin_stage(
                 mutator,
-                factory,
-                if options.runs() == 0 {
-                    128
-                } else {
-                    options.runs()
-                },
-            );
-            let mut stages = tuple_list!(tmin);
-            fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                TimeoutFeedback::new(),
+                options,
+                &mut harness,
+                &mut state,
+                &mut mgr,
+            )?;
         }
         kind => unimplemented!("Unsupported exit kind for test minification: {:?}", kind),
     }

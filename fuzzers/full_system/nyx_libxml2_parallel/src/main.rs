@@ -11,7 +11,7 @@ use libafl::{
     schedulers::RandScheduler,
     stages::StdMutationalStage,
     state::StdState,
-    Error, Fuzzer, StdFuzzer,
+    Error, StdFuzzer,
 };
 use libafl_bolts::{
     core_affinity::Cores,
@@ -65,12 +65,12 @@ fn main() {
 
         println!("We're a client, let's fuzz :)");
         let mutator = HavocScheduledMutator::new(havoc_mutations());
-        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+        let stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A fuzzer with feedbacks and a corpus scheduler
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut restarting_mgr)?;
+        fuzzer.fuzz_loop(&mut executor, &mut state, &mut restarting_mgr)?;
         Ok(())
     };
 

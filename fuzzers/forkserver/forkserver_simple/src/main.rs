@@ -9,13 +9,13 @@ use libafl::{
     executors::{HasObservers, StdChildArgs, forkserver::ForkserverExecutor},
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{HavocScheduledMutator, Tokens, havoc_mutations, tokens_mutations},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::mutational::StdMutationalStage,
+    stages::StdMutationalStage,
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
@@ -155,9 +155,6 @@ pub fn main() {
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     // If we should debug the child
     let debug_child = opt.debug_child;
 
@@ -179,6 +176,16 @@ pub fn main() {
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
+    state.add_metadata(tokens);
+
+    // Setup a mutational stage with a basic bytes mutator
+    let mutator =
+        HavocScheduledMutator::with_max_stack_pow(havoc_mutations().merge(tokens_mutations()), 6);
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
+
+    // A fuzzer with feedbacks, a corpus scheduler, and stages
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
+
     if let Some(dynamic_map_size) = executor.coverage_map_size() {
         executor.observers_mut()[&observer_ref]
             .as_mut()
@@ -195,14 +202,7 @@ pub fn main() {
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    state.add_metadata(tokens);
-
-    // Setup a mutational stage with a basic bytes mutator
-    let mutator =
-        HavocScheduledMutator::with_max_stack_pow(havoc_mutations().merge(tokens_mutations()), 6);
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 }

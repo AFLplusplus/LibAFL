@@ -18,7 +18,7 @@ use crate::{
 
 /// Use a const size to speedup `Feedback::is_interesting` when the user can
 /// know the size of the map at compile time.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[expect(clippy::unsafe_derive_deserialize)]
 pub struct ConstMapObserver<'a, T, const N: usize> {
     map: OwnedMutSizedSlice<'a, T, N>,

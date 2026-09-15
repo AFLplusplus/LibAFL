@@ -11,7 +11,7 @@ use libafl::{
     schedulers::RandScheduler,
     stages::StdMutationalStage,
     state::StdState,
-    Fuzzer, StdFuzzer,
+    StdFuzzer,
 };
 use libafl_bolts::{rands::StdRand, tuples::tuple_list};
 use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper, settings::NyxSettings};
@@ -35,8 +35,10 @@ fn main() {
     let mut feedback = MaxMapFeedback::new(&observer);
     let mut objective = CrashFeedback::new();
     let mut state = StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
     let scheduler = RandScheduler::new();
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
     // switch monitor if you want
     // let monitor = SimpleMonitor::new(|x|-> () {println!("{}",x)});
@@ -44,11 +46,9 @@ fn main() {
 
     let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = NyxExecutor::builder().build(helper, tuple_list!(observer));
-    let mutator = HavocScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     // start fuzz
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut executor, &mut state, &mut mgr)
         .expect("error when fuzz");
 }

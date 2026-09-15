@@ -7,7 +7,7 @@ use std::{
 };
 
 use libafl::{
-    Error, HasScheduler, StdFuzzer,
+    Error, StdFuzzer,
     corpus::Corpus,
     events::{SendExiting, SimpleRestartingEventManager},
     executors::{ExitKind, InProcessExecutor},
@@ -156,7 +156,7 @@ pub fn merge(
         )
     }, Ok)?;
 
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective); // The wrapped harness function, calling out to the LLVM-style harness
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, ()); // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = &target;

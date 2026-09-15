@@ -14,7 +14,7 @@ use libafl::{
     schedulers::QueueScheduler,
     stages::{RetryCountRestartHelper, StdMutationalStage},
     state::{HasSolutions, StdState},
-    Fuzzer, StdFuzzer,
+    StdFuzzer,
 };
 use libafl_bolts::{nonzero, rands::StdRand, serdeany::RegistryBuilder, tuples::tuple_list};
 use wasm_bindgen::prelude::*;
@@ -116,21 +116,25 @@ pub fn fuzz() {
     // such as the notification of the addition of a new item to the corpus
     let mut mgr = SimpleEventManager::new(monitor);
 
+    // Setup a mutational stage with a basic bytes mutator
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
+
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
     // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
-        &mut harness,
-        tuple_list!(observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the Executor");
+    let mut executor = InProcessExecutor::builder()
+        .harness(&mut harness)
+        .observers(tuple_list!(observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()
+        .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(nonzero!(32));
@@ -140,13 +144,9 @@ pub fn fuzz() {
         .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
         .expect("Failed to generate the initial corpus");
 
-    // Setup a mutational stage with a basic bytes mutator
-    let mutator = HavocScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
     while state.solutions().is_empty() {
         fuzzer
-            .fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)
+            .fuzz_one(&mut executor, &mut state, &mut mgr)
             .expect("Error in the fuzzing loop");
     }
 }

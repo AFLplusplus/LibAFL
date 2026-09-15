@@ -60,6 +60,12 @@ pub trait Observer<I, S>: Named {
     ) -> Result<(), Error> {
         Ok(())
     }
+
+    /// Return the runtime recorded by this observer for the last execution, if any.
+    #[inline]
+    fn last_runtime(&self) -> Option<Duration> {
+        None
+    }
 }
 
 /// A haskell-style tuple of observers
@@ -74,6 +80,11 @@ pub trait ObserversTuple<I, S>: MatchName {
         input: &I,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
+
+    /// Return the runtime recorded by any observer in this tuple for the last execution.
+    fn last_runtime_all(&self) -> Option<Duration> {
+        None
+    }
 }
 
 impl<I, S> ObserversTuple<I, S> for () {
@@ -88,6 +99,10 @@ impl<I, S> ObserversTuple<I, S> for () {
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
+    }
+
+    fn last_runtime_all(&self) -> Option<Duration> {
+        None
     }
 }
 
@@ -109,6 +124,10 @@ where
     ) -> Result<(), Error> {
         self.0.post_exec(state, input, exit_kind)?;
         self.1.post_exec_all(state, input, exit_kind)
+    }
+
+    fn last_runtime_all(&self) -> Option<Duration> {
+        self.0.last_runtime().or_else(|| self.1.last_runtime_all())
     }
 }
 
@@ -285,10 +304,34 @@ impl TimeObserver {
         }
     }
 
+    /// Creates a new [`TimeObserver`] with a predetermined runtime.
+    #[must_use]
+    pub fn with_runtime<S>(name: S, runtime: Duration) -> Self
+    where
+        S: Into<Cow<'static, str>>,
+    {
+        Self {
+            name: name.into(),
+
+            #[cfg(feature = "std")]
+            start_time: Instant::now(),
+
+            #[cfg(not(feature = "std"))]
+            start_time: Duration::from_secs(0),
+
+            last_runtime: Some(runtime),
+        }
+    }
+
     /// Gets the runtime for the last execution of this target.
     #[must_use]
     pub fn last_runtime(&self) -> &Option<Duration> {
         &self.last_runtime
+    }
+
+    /// Sets the runtime for this execution manually (useful for parallel / async workers).
+    pub fn set_last_runtime(&mut self, runtime: Duration) {
+        self.last_runtime = Some(runtime);
     }
 }
 
@@ -327,6 +370,11 @@ impl<I, S> Observer<I, S> for TimeObserver {
     ) -> Result<(), Error> {
         self.last_runtime = Some(current_time().saturating_sub(self.start_time));
         Ok(())
+    }
+
+    #[inline]
+    fn last_runtime(&self) -> Option<Duration> {
+        self.last_runtime
     }
 }
 

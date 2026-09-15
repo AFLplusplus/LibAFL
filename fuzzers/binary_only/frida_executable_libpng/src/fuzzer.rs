@@ -11,7 +11,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
@@ -195,13 +195,14 @@ unsafe fn fuzz(
                 // Setup a basic mutator with a mutational stage
                 let mutator =
                     HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+                let stages = tuple_list!(StdMutationalStage::new(mutator));
 
                 // A minimization+queue policy to get testcasess from the corpus
                 let scheduler =
                     IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
-                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
                 #[cfg(unix)]
                 let observers = tuple_list!(
@@ -216,13 +217,13 @@ unsafe fn fuzz(
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
                     &gum,
-                    InProcessExecutor::new(
-                        &mut frida_harness,
-                        observers,
-                        &mut fuzzer,
-                        &mut state,
-                        &mut mgr,
-                    )?,
+                    InProcessExecutor::builder()
+                        .harness(&mut frida_harness)
+                        .observers(observers)
+                        .fuzzer(&mut fuzzer)
+                        .state(&mut state)
+                        .event_mgr(&mut mgr)
+                        .build()?,
                     Rc::clone(&frida_helper),
                 );
 
@@ -239,9 +240,7 @@ unsafe fn fuzz(
                     println!("We imported {} inputs from disk.", state.corpus().count());
                 }
 
-                let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
-                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                fuzzer.fuzz_loop(&mut executor, &mut state, &mut mgr)?;
 
                 Ok(())
             })(state, mgr, client_description)
@@ -329,12 +328,25 @@ unsafe fn fuzz(
                 let mutator =
                     HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
+                let tracing = ShadowTracingStage::new();
+
+                // Setup a randomic Input2State stage
+                let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+                    I2SRandReplace::new()
+                )));
+
+                // Setup a basic mutator
+                let mutational = StdMutationalStage::new(mutator);
+
+                // The order of the stages matter!
+                let stages = tuple_list!(tracing, i2s, mutational);
+
                 // A minimization+queue policy to get testcasess from the corpus
                 let scheduler =
                     IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
-                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
                 #[cfg(unix)]
                 let observers = tuple_list!(
@@ -349,13 +361,13 @@ unsafe fn fuzz(
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
                     &gum,
-                    InProcessExecutor::new(
-                        &mut frida_harness,
-                        observers,
-                        &mut fuzzer,
-                        &mut state,
-                        &mut mgr,
-                    )?,
+                    InProcessExecutor::builder()
+                        .harness(&mut frida_harness)
+                        .observers(observers)
+                        .fuzzer(&mut fuzzer)
+                        .state(&mut state)
+                        .event_mgr(&mut mgr)
+                        .build()?,
                     Rc::clone(&frida_helper),
                 );
 
@@ -377,20 +389,7 @@ unsafe fn fuzz(
 
                 let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
-                let tracing = ShadowTracingStage::new();
-
-                // Setup a randomic Input2State stage
-                let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
-                    I2SRandReplace::new()
-                )));
-
-                // Setup a basic mutator
-                let mutational = StdMutationalStage::new(mutator);
-
-                // The order of the stages matter!
-                let mut stages = tuple_list!(tracing, i2s, mutational);
-
-                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                fuzzer.fuzz_loop(&mut executor, &mut state, &mut mgr)?;
 
                 Ok(())
             })(state, mgr, client_description)
@@ -476,13 +475,14 @@ unsafe fn fuzz(
                 // Setup a basic mutator with a mutational stage
                 let mutator =
                     HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+                let stages = tuple_list!(StdMutationalStage::new(mutator));
 
                 // A minimization+queue policy to get testcasess from the corpus
                 let scheduler =
                     IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
-                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+                let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
                 #[cfg(unix)]
                 let observers = tuple_list!(
@@ -497,13 +497,13 @@ unsafe fn fuzz(
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
                     &gum,
-                    InProcessExecutor::new(
-                        &mut frida_harness,
-                        observers,
-                        &mut fuzzer,
-                        &mut state,
-                        &mut mgr,
-                    )?,
+                    InProcessExecutor::builder()
+                        .harness(&mut frida_harness)
+                        .observers(observers)
+                        .fuzzer(&mut fuzzer)
+                        .state(&mut state)
+                        .event_mgr(&mut mgr)
+                        .build()?,
                     Rc::clone(&frida_helper),
                 );
 
@@ -520,9 +520,7 @@ unsafe fn fuzz(
                     println!("We imported {} inputs from disk.", state.corpus().count());
                 }
 
-                let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
-                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                fuzzer.fuzz_loop(&mut executor, &mut state, &mut mgr)?;
 
                 Ok(())
             })(state, mgr, client_description)

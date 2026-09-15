@@ -9,7 +9,7 @@ publish = false
 cargo-fuzz = true
 
 [dependencies]
-libafl_asan = { path = "../", default-features = false, features = [
+libafl_asan = { workspace = true, features = [
   "dlmalloc",
   "guest",
   "host",

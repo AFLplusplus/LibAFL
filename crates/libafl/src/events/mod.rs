@@ -593,6 +593,25 @@ pub trait EventRestarter<S> {
     /// or an internal [`EventRestarter`], before the state is saved for recovery.
     /// [`std_on_restart`] is the standard implementation that you can call.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error>;
+
+    /// Hook invoked in the respawned/resumed child process after state recovery to re-initialize
+    /// LLMP channels, shared memory descriptors, or custom restarter hooks.
+    fn on_resume(&mut self, _state: &mut S) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// A hook invoked around process restarts (`pre_restart` before exit, `post_resume` after respawn).
+pub trait RestarterHook<S> {
+    /// Called in the exiting child process before state is serialized.
+    fn pre_restart(&mut self, _state: &mut S) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Called in the respawned child process after state is deserialized (e.g. to re-init LLMP or shmem).
+    fn post_resume(&mut self, _state: &mut S) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 /// Default implementation of [`EventRestarter::on_restart`] for implementors with the given
@@ -665,12 +684,9 @@ impl<I, S> EventFirer<I, S> for NopEventManager {
     }
 }
 
-impl<S> EventRestarter<S> for NopEventManager
-where
-    S: HasCurrentStageId,
-{
-    fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
-        std_on_restart(self, state)
+impl<S> EventRestarter<S> for NopEventManager {
+    fn on_restart(&mut self, _state: &mut S) -> Result<(), Error> {
+        Ok(())
     }
 }
 

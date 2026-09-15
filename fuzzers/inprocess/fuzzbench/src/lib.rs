@@ -22,7 +22,7 @@ use libafl::{
     executors::{ExitKind, ShadowExecutor, inprocess::InProcessExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
@@ -34,8 +34,7 @@ use libafl::{
         IndexesLenTimeMinimizerScheduler, StdWeightedScheduler, powersched::PowerSchedule,
     },
     stages::{
-        ShadowTracingStage, StdMutationalStage, calibrate::CalibrationStage,
-        power::StdPowerMutationalStage,
+        CalibrationStage, ShadowTracingStage, StdMutationalStage, StdPowerMutationalStage,
     },
     state::{HasCorpus, StdState},
 };
@@ -270,7 +269,7 @@ fn fuzz(
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
-    let calibration = CalibrationStage::new(&map_feedback);
+    let calibration = CalibrationStage::new();
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
@@ -324,8 +323,13 @@ fn fuzz(
         5,
     )?;
 
-    let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
-        StdPowerMutationalStage::new(mutator);
+    let power = StdPowerMutationalStage::new(mutator);
+
+    // Setup a tracing stage in which we log comparisons
+    let tracing = ShadowTracingStage::new();
+
+    // The order of the stages matter!
+    let stages = tuple_list!(calibration, tracing, i2s, power);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
@@ -338,7 +342,7 @@ fn fuzz(
     );
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
@@ -361,12 +365,6 @@ fn fuzz(
         .build()?;
 
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
-
-    // Setup a tracing stage in which we log comparisons
-    let tracing = ShadowTracingStage::new();
-
-    // The order of the stages matter!
-    let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Read tokens
     if state.metadata_map().get::<Tokens>().is_none() {
@@ -403,7 +401,7 @@ fn fuzz(
     // reopen file to make sure we're at the end
     log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);
 
-    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+    fuzzer.fuzz_loop(&mut executor, &mut state, &mut mgr)?;
 
     // Never reached
     Ok(())

@@ -19,7 +19,7 @@ pub struct Client<'a> {
 }
 
 impl Client<'_> {
-    pub fn new(options: &FuzzerOptions) -> Client {
+    pub fn new(options: &FuzzerOptions) -> Client<'_> {
         Client { options }
     }
 

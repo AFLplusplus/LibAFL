@@ -140,7 +140,7 @@ where
 }
 
 /// Proxy the observers of the inner executors
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(
     bound = "A: serde::Serialize + serde::de::DeserializeOwned, B: serde::Serialize + serde::de::DeserializeOwned, DOT: serde::Serialize + serde::de::DeserializeOwned"
 )]
@@ -167,6 +167,10 @@ where
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.differential.post_exec_all(state, input, exit_kind)
+    }
+
+    fn last_runtime_all(&self) -> Option<core::time::Duration> {
+        self.differential.last_runtime_all()
     }
 }
 

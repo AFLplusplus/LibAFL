@@ -11,13 +11,13 @@ use libafl::{
     },
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{havoc_mutations, tokens_mutations, HavocScheduledMutator, Tokens},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::mutational::StdMutationalStage,
+    stages::StdMutationalStage,
     state::{HasCorpus, StdState},
     HasMetadata,
 };
@@ -172,7 +172,7 @@ pub fn main() {
     let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::without_stages(scheduler, feedback, objective);
 
     // If we should debug the child
     let debug_child = opt.debug_child;
@@ -220,9 +220,10 @@ pub fn main() {
     // Setup a mutational stage with a basic bytes mutator
     let mutator =
         HavocScheduledMutator::with_max_stack_pow(havoc_mutations().merge(tokens_mutations()), 6);
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
+    let mut fuzzer = fuzzer.with_stages(stages);
 
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 }

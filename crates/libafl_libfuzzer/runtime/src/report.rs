@@ -1,37 +1,27 @@
 use std::ffi::c_int;
 
 use libafl::{
-    Error, Fuzzer, HasMetadata, HasNamedMetadata,
-    events::{EventReceiver, ProgressReporter, SimpleEventManager},
-    executors::HasObservers,
+    Error, FuzzingEngine, HasNamedMetadata,
+    events::SimpleEventManager,
+    executors::{Executor, HasObservers},
     feedbacks::MapFeedbackMetadata,
     monitors::SimpleMonitor,
-    stages::StagesTuple,
-    state::{HasCurrentStageId, HasExecutions, HasLastReportTime, Stoppable},
 };
 
 use crate::{fuzz_with, options::LibfuzzerOptions};
 
 #[expect(clippy::unnecessary_wraps, clippy::cast_precision_loss)]
-fn do_report<E, F, I, S, ST, EM>(
+fn do_report<E, F, I, S, EM>(
     _options: &LibfuzzerOptions,
     _fuzzer: &mut F,
-    _stages: &mut ST,
     _executor: &mut E,
     state: &S,
     _mgr: &mut EM,
 ) -> Result<(), Error>
 where
-    F: Fuzzer<E, EM, I, S, ST>,
-    S: HasMetadata
-        + HasNamedMetadata
-        + HasExecutions
-        + HasLastReportTime
-        + HasCurrentStageId
-        + Stoppable,
-    E: HasObservers,
-    EM: ProgressReporter<S> + EventReceiver<I, S>,
-    ST: StagesTuple<E, EM, S, F>,
+    F: FuzzingEngine<EM, I, E::Observers, S>,
+    E: HasObservers + Executor<EM, I, S, F>,
+    S: HasNamedMetadata,
 {
     let meta = state
         .named_metadata::<MapFeedbackMetadata<u8>>("edges")

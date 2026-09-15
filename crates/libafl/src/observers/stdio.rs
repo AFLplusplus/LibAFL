@@ -118,22 +118,21 @@ use crate::{Error, observers::Observer};
 ///  .unwrap();
 ///
 ///  let scheduler = QueueScheduler::new();
-///  let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-///  let mut manager = NopEventManager::new();
-///
-///  let mut stages = tuple_list!(StdMutationalStage::new(NopMutator::new(
+///  let stages = tuple_list!(StdMutationalStage::new(NopMutator::new(
 ///      MutationResult::Mutated
 ///  )));
+///  let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
+///  let mut manager = NopEventManager::new();
 ///
-///  state
+///  let corpus_id = state
 ///      .corpus_mut()
 ///      .add(Testcase::new(BytesInput::from(
 ///          encoded_input_text.as_bytes().to_vec(),
 ///      )))
 ///      .unwrap();
 ///
-///  let corpus_id = fuzzer
-///      .fuzz_one(&mut stages, &mut executor, &mut state, &mut manager)
+///  fuzzer
+///      .fuzz_one(&mut executor, &mut state, &mut manager)
 ///      .unwrap();
 ///
 ///  unsafe {
@@ -162,7 +161,7 @@ use crate::{Error, observers::Observer};
 ///      )));
 ///
 ///  fuzzer
-///      .fuzz_one(&mut stages, &mut executor, &mut state, &mut manager)
+///      .fuzz_one(&mut executor, &mut state, &mut manager)
 ///      .unwrap();
 ///
 ///  unsafe {
@@ -184,6 +183,21 @@ pub struct OutputObserver<T> {
     #[serde(skip)]
     /// Phantom data to hold the stream type
     phantom: PhantomData<T>,
+}
+
+impl<T> Clone for OutputObserver<T> {
+    fn clone(&self) -> Self {
+        Self {
+            name: self.name.clone(),
+            output: self.output.clone(),
+            file: self
+                .file
+                .as_ref()
+                .and_then(|f| f.try_clone().ok())
+                .or_else(|| Self::file().ok().flatten()),
+            phantom: PhantomData,
+        }
+    }
 }
 
 /// Blanket implementation for a [`std::fs::File`]. Fortunately the contents of the file

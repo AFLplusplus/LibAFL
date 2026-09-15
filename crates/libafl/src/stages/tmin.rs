@@ -30,8 +30,9 @@ use crate::{
     observers::ObserversTuple,
     schedulers::RemovableScheduler,
     stages::{
-        ExecutionCountRestartHelper, Restartable, Stage,
+        ExecutionCountRestartHelper, Restartable,
         mutational::{MutatedTransform, MutatedTransformPost},
+        pull::Stage,
     },
     start_timer,
     state::{

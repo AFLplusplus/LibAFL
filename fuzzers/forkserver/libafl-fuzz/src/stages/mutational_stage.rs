@@ -1,7 +1,7 @@
 use std::{borrow::Cow, marker::PhantomData};
 
 use libafl::{
-    stages::{MutationalStage, Restartable, Stage},
+    stages::pull::{MutationalStage, Restartable, Stage},
     Error,
 };
 use libafl_bolts::Named;

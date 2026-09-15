@@ -324,7 +324,7 @@ mod tests {
     use tuple_list::tuple_list;
 
     use crate::{
-        Evaluator, Fuzzer, StdFuzzer,
+        Evaluator, Fuzzer,
         corpus::InMemoryCorpus,
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor, nop::NopExecutor},
@@ -363,6 +363,9 @@ mod tests {
     #[serial]
     fn test_targetbytes_fuzzer_builds() {
         const TRUE_VAL: bool = true;
+        let _inproc_guard = crate::INPROCESS_TEST_MUTEX
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         let true_observer = ValueObserver::new("test_value", OwnedRef::Ref(&TRUE_VAL));
         let mut feedback = BoolValueFeedback::new(&true_observer.handle());
@@ -386,7 +389,7 @@ mod tests {
             ExitKind::Ok
         };
 
-        let mut fuzzer = StdFuzzer::builder()
+        let mut fuzzer = crate::fuzzer::PullStdFuzzer::builder()
             .target_bytes_converter(bytes_converter)
             .scheduler(QueueScheduler::new())
             .feedback(feedback)

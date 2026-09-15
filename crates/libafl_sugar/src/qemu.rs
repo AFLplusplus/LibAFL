@@ -13,7 +13,7 @@ use libafl::{
     executors::{ExitKind, ShadowExecutor},
     feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::{Fuzzer, PullStdFuzzer as StdFuzzer},
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
@@ -25,7 +25,7 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{CalibrationStage, ShadowTracingStage, StdMutationalStage},
+    stages::pull::{CalibrationStage, ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{

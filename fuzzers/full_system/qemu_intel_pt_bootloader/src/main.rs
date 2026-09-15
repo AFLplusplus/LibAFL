@@ -16,7 +16,7 @@ use libafl::{
     executors::ExitKind,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
@@ -187,11 +187,15 @@ fn main() {
     )
     .unwrap();
 
+    // Setup an havoc mutator with a mutational stage
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
+
     // A queue policy to get testcases from the corpus
     let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
     // Create a QEMU in-process executor
     let mut executor = QemuExecutor::new(
@@ -212,16 +216,12 @@ fn main() {
         .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 4)
         .expect("Failed to generate the initial corpus");
 
-    // Setup an havoc mutator with a mutational stage
-    let mutator = HavocScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
     while state.solutions().is_empty() {
         mgr.maybe_report_progress(&mut state, Duration::from_secs(5))
             .unwrap();
 
         fuzzer
-            .fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)
+            .fuzz_one(&mut executor, &mut state, &mut mgr)
             .expect("Error in the fuzzing loop");
     }
 }

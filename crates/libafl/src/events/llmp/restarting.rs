@@ -361,7 +361,6 @@ mod tests {
         events::llmp::restarting::_ENV_FUZZER_SENDER,
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
-        fuzzer::Fuzzer,
         inputs::BytesInput,
         mutators::BitFlipMutator,
         observers::TimeObserver,
@@ -374,6 +373,9 @@ mod tests {
     #[serial]
     #[cfg_attr(miri, ignore)]
     fn test_mgr_state_restore() {
+        let _inproc_guard = crate::INPROCESS_TEST_MUTEX
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         // # Safety
         // The same testcase doesn't usually run twice
         #[cfg(any(not(feature = "serdeany_autoreg"), miri))]
@@ -420,7 +422,9 @@ mod tests {
         let feedback = ConstFeedback::new(true);
         let objective = ConstFeedback::new(false);
 
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        let mutator = BitFlipMutator::new();
+        let stages = tuple_list!(StdMutationalStage::new(mutator));
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
         let mut harness = |_buf: &BytesInput| ExitKind::Ok;
         let mut executor = InProcessExecutor::builder()
@@ -431,9 +435,6 @@ mod tests {
             .event_mgr(&mut llmp_mgr)
             .build()
             .unwrap();
-
-        let mutator = BitFlipMutator::new();
-        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // First, create a channel from the current fuzzer to the next to store state between restarts.
         let mut staterestorer = StateRestorer::<StdShMem, StdShMemProvider>::new(
@@ -468,12 +469,7 @@ mod tests {
             .unwrap();
 
         fuzzer
-            .fuzz_one(
-                &mut stages,
-                &mut executor,
-                &mut state_clone,
-                &mut llmp_clone,
-            )
+            .fuzz_loop_for(&mut executor, &mut state_clone, &mut llmp_clone, 1)
             .unwrap();
     }
 }

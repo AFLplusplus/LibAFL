@@ -1,6 +1,5 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
-#[cfg(feature = "std")]
 use alloc::vec::Vec;
 use core::{
     borrow::BorrowMut,
@@ -32,8 +31,9 @@ use crate::{
     Error, HasMetadata, HasNamedMetadata,
     corpus::{Corpus, CorpusId, HasCurrentCorpusId, HasTestcase, InMemoryCorpus, Testcase},
     events::{Event, EventFirer, EventWithStats, LogSeverity},
+    executors::ExitKind,
     feedbacks::StateInitializer,
-    fuzzer::{Evaluator, ExecuteInputResult},
+    fuzzer::{Evaluator, ExecuteInputResult, ExecutionMode, ExecutionTag},
     generators::Generator,
     inputs::{Input, NopInput},
     stages::StageId,
@@ -73,6 +73,7 @@ where
     C: Serialize + DeserializeOwned,
     R: Rand + Serialize + for<'de> Deserialize<'de>,
     SC: Serialize + DeserializeOwned,
+    I: Serialize + DeserializeOwned,
 {
 }
 
@@ -176,6 +177,24 @@ pub trait HasLastReportTime {
     fn last_report_time_mut(&mut self) -> &mut Option<Duration>;
 }
 
+/// Trait for states holding the current execution mode tag.
+pub trait HasExecutionMode {
+    /// The [`ExecutionMode`] the target executor should currently run inputs in.
+    fn execution_mode(&self) -> ExecutionMode;
+
+    /// Set the current [`ExecutionMode`].
+    fn set_execution_mode(&mut self, mode: ExecutionMode);
+}
+
+/// Trait for states holding the exit kind of the last target execution.
+pub trait HasLastExitKind {
+    /// Get the exit kind of the last target execution.
+    fn last_exit_kind(&self) -> Option<ExitKind>;
+
+    /// Set the exit kind of the last target execution.
+    fn set_last_exit_kind(&mut self, exit_kind: Option<ExitKind>);
+}
+
 /// Struct that holds the options for input loading
 #[cfg(feature = "std")]
 pub struct LoadConfig<'a, I, S, Z> {
@@ -194,12 +213,22 @@ impl<I, S, Z> Debug for LoadConfig<'_, I, S, Z> {
     }
 }
 
+/// Upper bound on concurrently in-flight (scheduled but not-yet-retired) inputs tracked in
+/// [`StdState::active_inputs`].
+///
+/// In correct operation, inputs are retired promptly (via report/reconcile after execution), so
+/// this map stays small — bounded by the scheduling window. Exceeding this bound signals an
+/// input-retirement bug (a leak); we surface it loudly instead of silently discarding tracking
+/// state, which would corrupt in-process crash/timeout recovery.
+const MAX_ACTIVE_INFLIGHT_INPUTS: usize = 1 << 20;
+
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(bound = "
         C: serde::Serialize + for<'a> serde::Deserialize<'a>,
         R: serde::Serialize + for<'a> serde::Deserialize<'a>,
         SC: serde::Serialize + for<'a> serde::Deserialize<'a>,
+        I: serde::Serialize + for<'a> serde::Deserialize<'a>,
     ")]
 pub struct StdState<C, I, R, SC> {
     /// RNG instance
@@ -244,7 +273,321 @@ pub struct StdState<C, I, R, SC> {
     /// or at the beginning of the next fuzzing iteration
     stop_requested: bool,
     stage_stack: StageStack,
+    /// Current execution mode requested for the target executor
+    #[serde(default)]
+    execution_mode: ExecutionMode,
+    /// Staged inputs currently scheduled or in-flight for execution
+    #[serde(default)]
+    current_inputs: Vec<I>,
+    /// Index of the currently executing input within `current_inputs` (for exact batch resumption after crash/restart)
+    #[serde(default)]
+    current_input_idx: usize,
+    /// Active in-flight inputs tracked by monotonic execution handle `id`
+    #[serde(default)]
+    active_inputs: hashbrown::HashMap<u64, I>,
+    /// Next monotonic execution handle ID
+    #[serde(default = "default_next_execution_id")]
+    next_execution_id: u64,
+    /// Starting execution handle ID of the currently staged batch
+    #[serde(default = "default_next_execution_id")]
+    current_batch_start_id: u64,
+    /// Structured execution tag of the currently staged batch (persisted for stage routing across restart)
+    #[serde(default)]
+    current_batch_tag: Option<ExecutionTag>,
+    /// Exit kind of the last target execution
+    #[serde(default)]
+    last_exit_kind: Option<ExitKind>,
+    #[serde(default)]
+    pending_exit_kind: Option<ExitKind>,
+    #[serde(default)]
+    pending_exec_time: Option<Duration>,
     phantom: PhantomData<I>,
+}
+
+const fn default_next_execution_id() -> u64 {
+    1
+}
+
+/// Trait for states that hold the current batch of inputs staged for execution.
+pub trait HasCurrentInputs<I> {
+    /// Borrow the current batch of inputs staged for execution.
+    fn current_inputs(&self) -> &[I];
+
+    /// Mutable borrow to the current batch of inputs staged for execution.
+    fn current_inputs_mut(&mut self) -> &mut Vec<I>;
+
+    /// Get the index of the currently executing input within `current_inputs`.
+    fn current_input_idx(&self) -> usize;
+
+    /// Set the index of the currently executing input within `current_inputs`.
+    fn set_current_input_idx(&mut self, idx: usize);
+
+    /// Set the current batch of inputs staged for execution.
+    fn set_current_inputs(&mut self, inputs: Vec<I>) {
+        *self.current_inputs_mut() = inputs;
+        self.set_current_input_idx(0);
+    }
+
+    /// Set the current batch of inputs from a slice, reusing existing element allocations in-place.
+    fn set_current_inputs_slice(&mut self, inputs: &[I])
+    where
+        I: Clone,
+    {
+        let buf = self.current_inputs_mut();
+        let common = core::cmp::min(buf.len(), inputs.len());
+        for i in 0..common {
+            buf[i].clone_from(&inputs[i]);
+        }
+        if inputs.len() > common {
+            buf.extend_from_slice(&inputs[common..]);
+        } else {
+            buf.truncate(inputs.len());
+        }
+        self.set_current_input_idx(0);
+    }
+
+    /// Clear the current batch of staged inputs.
+    fn clear_current_inputs(&mut self) {
+        self.current_inputs_mut().clear();
+        self.set_current_input_idx(0);
+    }
+}
+
+/// Trait for states that track in-flight execution handles for the push fuzzing engine.
+///
+/// In-flight tracking covers the monotonic execution-id allocator, the active (scheduled but
+/// not-yet-retired) input map, the current batch's start id/tag, and the pending exit kind/time
+/// recorded by an in-process crash/timeout signal handler before restart. It extends
+/// [`HasCurrentInputs`] because completing an in-flight input advances the staging cursor.
+pub trait HasInFlightExecutions<I>: HasCurrentInputs<I> {
+    /// Get the starting execution ID of the currently staged batch.
+    fn current_batch_start_id(&self) -> u64;
+
+    /// Set the starting execution ID of the currently staged batch.
+    fn set_current_batch_start_id(&mut self, start_id: u64);
+
+    /// Get the structured execution tag of the currently staged batch.
+    fn current_batch_tag(&self) -> Option<ExecutionTag>;
+
+    /// Set the structured execution tag of the currently staged batch.
+    fn set_current_batch_tag(&mut self, tag: Option<ExecutionTag>);
+
+    /// Allocate and return the next monotonic execution handle ID.
+    fn next_execution_id(&mut self) -> u64;
+
+    /// Allocate a block of `count` monotonic execution handle IDs, returning the start ID.
+    #[inline]
+    fn allocate_execution_ids(&mut self, count: usize) -> u64 {
+        let start = self.next_execution_id();
+        for _ in 1..count {
+            let _ = self.next_execution_id();
+        }
+        start
+    }
+
+    /// Insert an active in-flight input by handle `id` into the state.
+    fn insert_active_input(&mut self, id: u64, input: I);
+
+    /// Check whether an active in-flight input is already tracked under handle `id`.
+    #[inline]
+    fn has_active_input(&self, _id: u64) -> bool {
+        false
+    }
+
+    /// Remove and return an active in-flight input by handle `id` from the state.
+    fn take_active_input(&mut self, id: u64) -> Option<I>;
+
+    /// Return the number of active in-flight inputs tracked in the state.
+    fn active_inputs_count(&self) -> usize;
+
+    /// Clear all active in-flight inputs tracked in the state.
+    fn clear_active_inputs(&mut self);
+
+    /// Get the pending exit kind recorded by an in-process crash/timeout signal handler before restart.
+    fn pending_exit_kind(&self) -> Option<ExitKind>;
+
+    /// Set or clear the pending exit kind recorded before restart.
+    fn set_pending_exit_kind(&mut self, exit_kind: Option<ExitKind>);
+
+    /// Get the pending execution duration recorded before restart.
+    fn pending_exec_time(&self) -> Option<Duration>;
+
+    /// Set or clear the pending execution duration recorded before restart.
+    fn set_pending_exec_time(&mut self, exec_time: Option<Duration>);
+
+    /// Mark the currently executing in-flight input as completed and advance `current_input_idx`.
+    fn mark_in_flight_input_completed(&mut self) {
+        if self.active_inputs_count() == 0 {
+            let idx = self.current_input_idx();
+            if idx < self.current_inputs().len() {
+                self.set_current_input_idx(idx + 1);
+            }
+        }
+    }
+}
+
+/// Everything a [`FuzzingEngine`](crate::fuzzer::FuzzingEngine) requires of its state.
+///
+/// This exists purely to name the set of capabilities the engine needs in one place, instead of
+/// repeating the same ten bounds on every engine method. It is implemented automatically for any
+/// state that satisfies them, so states never implement it by hand.
+pub trait FuzzerState<I>:
+    HasCorpus<I>
+    + HasSolutions<I>
+    + HasExecutions
+    + HasLastFoundTime
+    + HasCurrentTestcase<I>
+    + HasCurrentCorpusId
+    + HasInFlightExecutions<I>
+    + HasTestcase<I>
+    + HasCurrentStageId
+    + Stoppable
+{
+}
+
+impl<I, S> FuzzerState<I> for S where
+    S: HasCorpus<I>
+        + HasSolutions<I>
+        + HasExecutions
+        + HasLastFoundTime
+        + HasCurrentTestcase<I>
+        + HasCurrentCorpusId
+        + HasInFlightExecutions<I>
+        + HasTestcase<I>
+        + HasCurrentStageId
+        + Stoppable
+{
+}
+
+impl<C, I, R, SC> HasCurrentInputs<I> for StdState<C, I, R, SC> {
+    #[inline]
+    fn current_inputs(&self) -> &[I] {
+        &self.current_inputs
+    }
+
+    #[inline]
+    fn current_inputs_mut(&mut self) -> &mut Vec<I> {
+        &mut self.current_inputs
+    }
+
+    #[inline]
+    fn current_input_idx(&self) -> usize {
+        self.current_input_idx
+    }
+
+    #[inline]
+    fn set_current_input_idx(&mut self, idx: usize) {
+        self.current_input_idx = idx;
+    }
+}
+
+impl<C, I, R, SC> HasInFlightExecutions<I> for StdState<C, I, R, SC> {
+    #[inline]
+    fn current_batch_start_id(&self) -> u64 {
+        self.current_batch_start_id
+    }
+
+    #[inline]
+    fn set_current_batch_start_id(&mut self, start_id: u64) {
+        self.current_batch_start_id = start_id;
+    }
+
+    #[inline]
+    fn current_batch_tag(&self) -> Option<ExecutionTag> {
+        self.current_batch_tag
+    }
+
+    #[inline]
+    fn set_current_batch_tag(&mut self, tag: Option<ExecutionTag>) {
+        self.current_batch_tag = tag;
+    }
+
+    #[inline]
+    fn next_execution_id(&mut self) -> u64 {
+        let id = self.next_execution_id;
+        self.next_execution_id = self.next_execution_id.wrapping_add(1);
+        id
+    }
+
+    #[inline]
+    fn allocate_execution_ids(&mut self, count: usize) -> u64 {
+        if count == 0 {
+            return self.next_execution_id;
+        }
+        let start = self.next_execution_id;
+        self.next_execution_id = self.next_execution_id.wrapping_add(count as u64);
+        start
+    }
+
+    #[inline]
+    fn insert_active_input(&mut self, id: u64, input: I) {
+        assert!(
+            self.active_inputs.len() < MAX_ACTIVE_INFLIGHT_INPUTS,
+            "in-flight input tracking exceeded {MAX_ACTIVE_INFLIGHT_INPUTS} entries; this indicates \
+             an input-retirement bug (leak) in the fuzzing engine",
+        );
+        self.active_inputs.insert(id, input);
+    }
+
+    #[inline]
+    fn has_active_input(&self, id: u64) -> bool {
+        self.active_inputs.contains_key(&id)
+    }
+
+    #[inline]
+    fn take_active_input(&mut self, id: u64) -> Option<I> {
+        self.active_inputs.remove(&id)
+    }
+
+    #[inline]
+    fn active_inputs_count(&self) -> usize {
+        self.active_inputs.len()
+    }
+
+    #[inline]
+    fn clear_active_inputs(&mut self) {
+        self.active_inputs.clear();
+    }
+
+    fn pending_exit_kind(&self) -> Option<ExitKind> {
+        self.pending_exit_kind
+    }
+
+    fn set_pending_exit_kind(&mut self, exit_kind: Option<ExitKind>) {
+        self.pending_exit_kind = exit_kind;
+    }
+
+    fn pending_exec_time(&self) -> Option<Duration> {
+        self.pending_exec_time
+    }
+
+    fn set_pending_exec_time(&mut self, exec_time: Option<Duration>) {
+        self.pending_exec_time = exec_time;
+    }
+}
+
+impl<C, I, R, SC> HasExecutionMode for StdState<C, I, R, SC> {
+    #[inline]
+    fn execution_mode(&self) -> ExecutionMode {
+        self.execution_mode
+    }
+
+    #[inline]
+    fn set_execution_mode(&mut self, mode: ExecutionMode) {
+        self.execution_mode = mode;
+    }
+}
+
+impl<C, I, R, SC> HasLastExitKind for StdState<C, I, R, SC> {
+    #[inline]
+    fn last_exit_kind(&self) -> Option<ExitKind> {
+        self.last_exit_kind
+    }
+
+    #[inline]
+    fn set_last_exit_kind(&mut self, exit_kind: Option<ExitKind>) {
+        self.last_exit_kind = exit_kind;
+    }
 }
 
 impl<C, I, R, SC> HasRand for StdState<C, I, R, SC>
@@ -1154,6 +1497,16 @@ where
             last_found_time: libafl_bolts::current_time(),
             corpus_id: None,
             stage_stack: StageStack::default(),
+            execution_mode: ExecutionMode::Normal,
+            current_inputs: Vec::new(),
+            current_input_idx: 0,
+            active_inputs: hashbrown::HashMap::new(),
+            next_execution_id: 1,
+            current_batch_start_id: 1,
+            current_batch_tag: None,
+            last_exit_kind: None,
+            pending_exit_kind: None,
+            pending_exec_time: None,
             phantom: PhantomData,
             #[cfg(feature = "std")]
             multicore_inputs_processed: None,
@@ -1200,6 +1553,7 @@ pub struct NopState<I> {
     execution: u64,
     stop_requested: bool,
     rand: StdRand,
+    current_inputs: Vec<I>,
     phantom: PhantomData<I>,
 }
 
@@ -1213,6 +1567,7 @@ impl<I> NopState<I> {
             execution: 0,
             rand: StdRand::default(),
             stop_requested: false,
+            current_inputs: Vec::new(),
             phantom: PhantomData,
         }
     }
@@ -1318,6 +1673,55 @@ impl<I> HasCurrentCorpusId for NopState<I> {
     fn current_corpus_id(&self) -> Result<Option<CorpusId>, Error> {
         Ok(None)
     }
+}
+
+impl<I: Input + Clone> HasCurrentInputs<I> for NopState<I> {
+    fn current_inputs(&self) -> &[I] {
+        &self.current_inputs
+    }
+    fn current_inputs_mut(&mut self) -> &mut Vec<I> {
+        &mut self.current_inputs
+    }
+    fn current_input_idx(&self) -> usize {
+        0
+    }
+    fn set_current_input_idx(&mut self, _idx: usize) {}
+    fn set_current_inputs(&mut self, _inputs: Vec<I>) {}
+    fn set_current_inputs_slice(&mut self, _inputs: &[I]) {}
+    fn clear_current_inputs(&mut self) {}
+}
+
+impl<I: Input + Clone> HasInFlightExecutions<I> for NopState<I> {
+    fn current_batch_start_id(&self) -> u64 {
+        0
+    }
+    fn set_current_batch_start_id(&mut self, _start_id: u64) {}
+    fn current_batch_tag(&self) -> Option<ExecutionTag> {
+        None
+    }
+    fn set_current_batch_tag(&mut self, _tag: Option<ExecutionTag>) {}
+    fn next_execution_id(&mut self) -> u64 {
+        0
+    }
+    fn allocate_execution_ids(&mut self, _count: usize) -> u64 {
+        0
+    }
+    fn insert_active_input(&mut self, _id: u64, _input: I) {}
+    fn take_active_input(&mut self, _id: u64) -> Option<I> {
+        None
+    }
+    fn active_inputs_count(&self) -> usize {
+        0
+    }
+    fn clear_active_inputs(&mut self) {}
+    fn pending_exit_kind(&self) -> Option<ExitKind> {
+        None
+    }
+    fn set_pending_exit_kind(&mut self, _exit_kind: Option<ExitKind>) {}
+    fn pending_exec_time(&self) -> Option<Duration> {
+        None
+    }
+    fn set_pending_exec_time(&mut self, _exec_time: Option<Duration>) {}
 }
 
 impl<I> HasCurrentStageId for NopState<I> {

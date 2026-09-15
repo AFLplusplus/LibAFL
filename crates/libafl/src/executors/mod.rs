@@ -45,6 +45,15 @@ pub mod inprocess_fork;
 
 pub mod shadow;
 
+/// A worker-thread pool running many inputs concurrently, completing them out of order
+#[cfg(feature = "std")]
+pub mod pool;
+#[cfg(feature = "std")]
+pub use pool::ThreadPoolTargetExecutor;
+
+pub mod target;
+pub use target::*;
+
 pub mod with_observers;
 
 /// The module for all the hooks

@@ -13,7 +13,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::{Fuzzer, PullStdFuzzer as StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
     inputs::{
         FromBytesInputConverter, NautilusBytesConverter, NautilusInput, ToBytesInputConverter,
@@ -24,7 +24,7 @@ use libafl::{
         HavocScheduledMutator,
     },
     schedulers::QueueScheduler,
-    stages::{mutational::StdMutationalStage, sync::SyncFromBrokerStage},
+    stages::pull::{StdMutationalStage, SyncFromBrokerStage},
     state::StdState,
     Error, HasMetadata,
 };
@@ -199,18 +199,18 @@ pub extern "C" fn libafl_main() {
             .scheduler(scheduler)
             .feedback(feedback)
             .objective(objective)
-            .target_bytes_converter::<NautilusInput, _>(NautilusBytesConverter::new(&context))
+            .target_bytes_converter(NautilusBytesConverter::new(&context))
             .build();
 
         // Create the executor for an in-process function with just one observer
-        let mut executor = InProcessExecutor::new(
-            &mut harness,
-            tuple_list!(observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )
-        .expect("Failed to create the Executor");
+        let mut executor = InProcessExecutor::builder()
+            .harness(&mut harness)
+            .observers(tuple_list!(observer))
+            .fuzzer(&mut fuzzer)
+            .state(&mut state)
+            .event_mgr(&mut mgr)
+            .build()
+            .expect("Failed to create the Executor");
 
         // The actual target run starts here.
         // Call LLVMFUzzerInitialize() if present.

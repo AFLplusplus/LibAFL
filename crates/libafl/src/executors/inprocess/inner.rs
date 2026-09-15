@@ -131,7 +131,7 @@ impl<EM, HT, I, OT, S, Z> GenericInProcessExecutorInner<EM, HT, I, OT, S, Z>
 where
     HT: ExecutorHooksTuple<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasExecutions + HasSolutions<I>,
+    S: HasExecutions + HasSolutions<I> + crate::state::HasInFlightExecutions<I>,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     pub fn generic<E, OF>(
@@ -226,7 +226,9 @@ where
             phantom: PhantomData,
         })
     }
+}
 
+impl<EM, HT, I, OT, S, Z> GenericInProcessExecutorInner<EM, HT, I, OT, S, Z> {
     /// The inprocess handlers
     #[inline]
     pub fn hooks(&self) -> &(InProcessHooks<I, S>, HT) {

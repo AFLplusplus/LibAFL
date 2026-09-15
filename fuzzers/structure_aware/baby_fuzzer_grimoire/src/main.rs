@@ -7,7 +7,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Evaluator, Fuzzer, StdFuzzer},
+    fuzzer::{Evaluator, StdFuzzer},
     inputs::{BytesInput, GeneralizedInputMetadata, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
@@ -17,7 +17,7 @@ use libafl::{
     },
     observers::{CanTrack, StdMapObserver},
     schedulers::QueueScheduler,
-    stages::{mutational::StdMutationalStage, GeneralizationStage},
+    stages::{StdMutationalStage, GeneralizationStage},
     state::StdState,
     HasMetadata,
 };
@@ -123,23 +123,7 @@ pub fn main() {
     // such as the notification of the addition of a new item to the corpus
     let mut mgr = SimpleEventManager::new(monitor);
 
-    // A queue policy to get testcasess from the corpus
-    let scheduler = QueueScheduler::new();
-
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
     let generalization = GeneralizationStage::new(&observer);
-
-    // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
-        &mut harness,
-        tuple_list!(observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the Executor");
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = HavocScheduledMutator::with_max_stack_pow(havoc_mutations(), 2);
@@ -154,13 +138,29 @@ pub fn main() {
         ),
         3,
     );
-    let mut stages = tuple_list!(
+    let stages = tuple_list!(
         generalization,
         StdMutationalStage::new(mutator),
-        StdMutationalStage::<_, _, GeneralizedInputMetadata, BytesInput, _, _, _>::transforming(
-            grimoire_mutator
-        )
+        StdMutationalStage::transforming::<GeneralizedInputMetadata, BytesInput, _>(
+            grimoire_mutator,
+        ),
     );
+
+    // A queue policy to get testcasess from the corpus
+    let scheduler = QueueScheduler::new();
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
+
+    // Create the executor for an in-process function with just one observer
+    let mut executor = InProcessExecutor::builder()
+        .harness(&mut harness)
+        .observers(tuple_list!(observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()
+        .expect("Failed to create the Executor");
 
     for input in initial_inputs {
         fuzzer
@@ -169,6 +169,6 @@ pub fn main() {
     }
 
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 }

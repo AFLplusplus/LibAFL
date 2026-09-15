@@ -18,7 +18,7 @@ use libafl::{
     executors::{ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::{Fuzzer, PullStdFuzzer as StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
@@ -29,9 +29,8 @@ use libafl::{
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
-    stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
-        StdMutationalStage,
+    stages::pull::{
+        CalibrationStage, ShadowTracingStage, StdMutationalStage, StdPowerMutationalStage,
     },
     state::{HasCorpus, StdState},
     Error, HasMetadata,

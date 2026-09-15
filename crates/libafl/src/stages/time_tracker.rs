@@ -5,7 +5,7 @@ use libafl_bolts::{Error, current_time};
 
 use crate::{
     HasMetadata,
-    stages::{Restartable, Stage},
+    stages::{Restartable, pull::Stage},
 };
 /// Track an inner Stage's execution time
 #[derive(Debug)]

@@ -12,7 +12,6 @@ use core::sync::atomic::{AtomicPtr, Ordering};
     feature = "sancov_ctx",
     feature = "sancov_ngram8"
 ))]
-#[rustversion::nightly]
 use libafl::executors::hooks::ExecutorHook;
 
 #[cfg(any(feature = "sancov_ngram4", feature = "sancov_ngram8"))]
@@ -87,7 +86,6 @@ use alloc::vec::Vec;
     feature = "sancov_ngram8",
     feature = "sancov_ctx"
 ))]
-#[rustversion::nightly]
 use core::marker::PhantomData;
 
 /// The hook to initialize ngram everytime we run the harness
@@ -100,14 +98,12 @@ pub struct NgramHook<I, S> {
 
 /// The hook to initialize ctx everytime we run the harness
 #[cfg(feature = "sancov_ctx")]
-#[rustversion::nightly]
 #[derive(Debug, Copy, Clone)]
 pub struct CtxHook<I, S> {
     phantom: PhantomData<(I, S)>,
 }
 
 #[cfg(feature = "sancov_ctx")]
-#[rustversion::nightly]
 impl<I, S> CtxHook<I, S> {
     /// The constructor for this struct
     #[must_use]
@@ -119,7 +115,6 @@ impl<I, S> CtxHook<I, S> {
 }
 
 #[cfg(feature = "sancov_ctx")]
-#[rustversion::nightly]
 impl<I, S> Default for CtxHook<I, S> {
     fn default() -> Self {
         Self::new()
@@ -165,7 +160,6 @@ impl<I, S> Default for NgramHook<I, S> {
 }
 
 #[cfg(feature = "sancov_ctx")]
-#[rustversion::nightly]
 impl<I, S> ExecutorHook<I, S> for CtxHook<I, S> {
     fn init(&mut self, _state: &mut S) {}
     fn pre_exec(&mut self, _state: &mut S, _input: &I) {

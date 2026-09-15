@@ -19,8 +19,9 @@ use crate::{
     mutators::{MutationResult, Mutator},
     schedulers::{TestcaseScore, testcase_score::CorpusPowerTestcaseScore},
     stages::{
-        MutationalStage, Restartable, RetryCountRestartHelper, Stage,
+        MutationalStage, Restartable, RetryCountRestartHelper,
         mutational::{MutatedTransform, MutatedTransformPost},
+        pull::Stage,
     },
     start_timer,
     state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},

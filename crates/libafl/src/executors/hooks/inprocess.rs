@@ -238,7 +238,10 @@ impl<I, S> InProcessHooks<I, S> {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+        S: HasExecutions
+            + HasSolutions<I>
+            + HasCurrentTestcase<I>
+            + crate::state::HasInFlightExecutions<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {
@@ -283,7 +286,10 @@ impl<I, S> InProcessHooks<I, S> {
         EM: EventFirer<I, S> + EventRestarter<S>,
         I: Input + Clone,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+        S: HasExecutions
+            + HasSolutions<I>
+            + HasCurrentTestcase<I>
+            + crate::state::HasInFlightExecutions<I>,
         Z: HasObjective<Objective = OF>,
     {
         let ret;
@@ -344,7 +350,7 @@ impl<I, S> InProcessHooks<I, S> {
         E: Executor<EM, I, S, Z> + HasObservers + HasInProcessHooks<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I>,
+        S: HasExecutions + HasSolutions<I> + crate::state::HasInFlightExecutions<I>,
         Z: HasObjective<Objective = OF>,
     {
         #[cfg_attr(miri, allow(unused_variables))]
@@ -483,7 +489,11 @@ impl InProcessExecutorHandlerData {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I>,
+        S: HasExecutions
+            + HasSolutions<I>
+            + HasCorpus<I>
+            + HasCurrentTestcase<I>
+            + crate::state::HasInFlightExecutions<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {

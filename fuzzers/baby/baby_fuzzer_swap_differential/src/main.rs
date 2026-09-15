@@ -8,18 +8,18 @@ use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
 use libafl::monitors::SimpleMonitor;
 use libafl::{
-    corpus::{Corpus, InMemoryCorpus, InMemoryOnDiskCorpus},
+    corpus::{InMemoryCorpus, InMemoryOnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, DiffExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::mutational::StdMutationalStage,
-    state::{HasSolutions, StdState},
+    stages::StdMutationalStage,
+    state::StdState,
 };
 use libafl_bolts::{nonzero, rands::StdRand, tuples::tuple_list};
 use libafl_targets::{edges_max_num, DifferentialAFLMapSwapObserver};
@@ -215,26 +215,29 @@ pub fn main() {
     // A queue policy to get testcases from the corpus
     let scheduler = QueueScheduler::new();
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    // Setup a mutational stage with a basic bytes mutator
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
+
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
     // Create the executor for an in-process function with just one observer
-    let first_executor = InProcessExecutor::new(
-        &mut first_harness,
-        tuple_list!(first_map_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the first executor");
-    let second_executor = InProcessExecutor::new(
-        &mut second_harness,
-        tuple_list!(second_map_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the second executor");
+    let first_executor = InProcessExecutor::builder()
+        .harness(&mut first_harness)
+        .observers(tuple_list!(first_map_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()
+        .expect("Failed to create the first executor");
+    let second_executor = InProcessExecutor::builder()
+        .harness(&mut second_harness)
+        .observers(tuple_list!(second_map_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()
+        .expect("Failed to create the second executor");
 
     // create the differential executor, providing both the map swapper (which will ensure the
     // instrumentation picks the correct map to write to) and the map observer (which provides the
@@ -249,30 +252,19 @@ pub fn main() {
     let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
-    state
-        .generate_initial_inputs(
-            &mut fuzzer,
+    fuzzer
+        .generate_initial_inputs_with_executor(
             &mut differential_executor,
             &mut generator,
+            &mut state,
             &mut mgr,
             8,
         )
         .expect("Failed to generate the initial corpus");
 
-    // Setup a mutational stage with a basic bytes mutator
-    let mutator = HavocScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
-    while state.solutions().is_empty() {
-        fuzzer
-            .fuzz_one(
-                &mut stages,
-                &mut differential_executor,
-                &mut state,
-                &mut mgr,
-            )
-            .expect("Error in the fuzzing loop");
-    }
+    fuzzer
+        .fuzz_loop(&mut differential_executor, &mut state, &mut mgr)
+        .expect("Error in the fuzzing loop");
 
     #[cfg(feature = "multimap")]
     unsafe {

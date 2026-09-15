@@ -11,7 +11,6 @@ use libafl::{
         CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback,
         NautilusUnparseToMetadataFeedback, TimeFeedback,
     },
-    fuzzer::Fuzzer,
     generators::{NautilusContext, NautilusGenerator},
     inputs::{NautilusBytesConverter, NautilusInput},
     monitors::SimpleMonitor,
@@ -21,9 +20,10 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::mutational::StdMutationalStage,
+    stages::StdMutationalStage,
     state::StdState,
-    BloomInputFilter, HasMetadata, StdFuzzerBuilder,
+    fuzzer::StdFuzzer,
+    HasMetadata,
 };
 use libafl_bolts::{
     current_nanos,
@@ -179,13 +179,8 @@ pub fn main() {
 
     // A fuzzer with feedbacks and a corpus scheduler
     let converter = NautilusBytesConverter::new(&context);
-    let mut fuzzer = StdFuzzerBuilder::new()
-        .input_filter(BloomInputFilter::default())
-        .target_bytes_converter(converter)
-        .scheduler(scheduler)
-        .feedback(feedback)
-        .objective(objective)
-        .build();
+    let mut fuzzer =
+        StdFuzzer::without_stages_with_converter(scheduler, feedback, objective, converter);
 
     // If we should debug the child
     let debug_child = opt.debug_child;
@@ -240,9 +235,10 @@ pub fn main() {
         ),
         2,
     );
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
+    let mut fuzzer = fuzzer.with_stages(stages);
 
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 }

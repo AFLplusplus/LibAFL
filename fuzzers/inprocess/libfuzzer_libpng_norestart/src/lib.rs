@@ -26,7 +26,7 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::mutational::StdMutationalStage,
+    stages::StdMutationalStage,
     state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
@@ -222,7 +222,7 @@ pub extern "C" fn libafl_main() {
             IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |input: &BytesInput| {
@@ -270,8 +270,7 @@ pub extern "C" fn libafl_main() {
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        fuzzer.fuzz_loop_for(
-            &mut stages,
+                fuzzer.fuzz_loop_for(
             &mut executor,
             &mut state,
             &mut restarting_mgr,

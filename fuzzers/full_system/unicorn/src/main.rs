@@ -12,7 +12,7 @@ use libafl::{
     executors::{ExitKind, InProcessExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
@@ -20,7 +20,7 @@ use libafl::{
     nonzero,
     observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
     schedulers::QueueScheduler,
-    stages::mutational::StdMutationalStage,
+    stages::StdMutationalStage,
     state::StdState,
 };
 use libafl_bolts::{
@@ -283,20 +283,24 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
     )
     .unwrap();
 
+    // Setup a mutational stage with a basic bytes mutator
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
+
     // A minimization+queue policy to get test cases from the corpus
     let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
-    let mut executor = InProcessExecutor::new(
-        &mut harness,
-        tuple_list!(edges_observer, time_observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the executor");
+    let mut executor = InProcessExecutor::builder()
+        .harness(&mut harness)
+        .observers(tuple_list!(edges_observer, time_observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()
+        .expect("Failed to create the executor");
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandBytesGenerator::new(nonzero!(4));
@@ -306,12 +310,8 @@ fn fuzzer(should_emulate: bool, arch: Arch) {
         .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
         .expect("Failed to generate the initial corpus");
 
-    // Setup a mutational stage with a basic bytes mutator
-    let mutator = HavocScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 }
 

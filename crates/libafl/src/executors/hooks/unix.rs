@@ -94,7 +94,10 @@ pub mod unix_signal_handler {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+        S: HasExecutions
+            + HasSolutions<I>
+            + HasCurrentTestcase<I>
+            + crate::state::HasInFlightExecutions<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {
@@ -155,7 +158,10 @@ pub mod unix_signal_handler {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+        S: HasExecutions
+            + HasSolutions<I>
+            + HasCurrentTestcase<I>
+            + crate::state::HasInFlightExecutions<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {
@@ -213,7 +219,10 @@ pub mod unix_signal_handler {
         E::Observers: ObserversTuple<I, S>,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+        S: HasExecutions
+            + HasSolutions<I>
+            + HasCurrentTestcase<I>
+            + crate::state::HasInFlightExecutions<I>,
         Z: HasObjective<Objective = OF>,
         I: Input + Clone,
     {

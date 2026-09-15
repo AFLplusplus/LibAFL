@@ -1,6 +1,10 @@
 use std::{path::PathBuf, ptr::write};
 
-use libafl::prelude::*;
+use libafl::{
+    fuzzer::StdFuzzer,
+    prelude::*,
+    stages::{StdMutationalStage, StdTMinMutationalStage},
+};
 use libafl_bolts::prelude::*;
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
@@ -67,79 +71,44 @@ pub fn main() -> Result<(), Error> {
     )
     .unwrap();
 
-    // A queue policy to get testcasess from the corpus
+    // A queue policy to get testcases from the corpus
     let scheduler = QueueScheduler::new();
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    // Setup a mutational stage with a basic bytes mutator and a minimizer stage
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
+    let minimizer = HavocScheduledMutator::new(havoc_mutations());
+    let stages = tuple_list!(
+        StdMutationalStage::new(mutator),
+        StdTMinMutationalStage::new(minimizer, factory, 128)
+    );
+
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
     // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
-        &mut harness,
-        tuple_list!(observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the Executor");
+    let mut executor = InProcessExecutor::builder()
+        .harness(&mut harness)
+        .observers(tuple_list!(observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()
+        .expect("Failed to create the Executor");
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(nonzero!(32));
 
     // Generate 8 initial inputs
-    state
-        .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
+    fuzzer
+        .generate_initial_inputs_with_executor(
+            &mut executor,
+            &mut generator,
+            &mut state,
+            &mut mgr,
+            8,
+        )
         .expect("Failed to generate the initial corpus");
 
-    // Setup a mutational stage with a basic bytes mutator
-    let mutator = HavocScheduledMutator::new(havoc_mutations());
-    let minimizer = HavocScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(
-        StdMutationalStage::new(mutator),
-        StdTMinMutationalStage::new(minimizer, factory, 128)
-    );
-
-    while state.solutions().is_empty() {
-        fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)?;
-    }
-
-    let minimized_dir = PathBuf::from("./minimized");
-
-    let mut state = StdState::new(
-        StdRand::new(),
-        InMemoryOnDiskCorpus::new(minimized_dir).unwrap(),
-        InMemoryCorpus::new(),
-        &mut (),
-        &mut (),
-    )
-    .unwrap();
-
-    // The Monitor trait define how the fuzzer stats are displayed to the user
-    let mon = SimpleMonitor::new(|s| println!("{s}"));
-
-    let mut mgr = SimpleEventManager::new(mon);
-
-    let minimizer = HavocScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdTMinMutationalStage::new(
-        minimizer,
-        CrashFeedback::new(),
-        1 << 10,
-    ));
-
-    let scheduler = QueueScheduler::new();
-
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, (), ());
-
-    // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(&mut harness, (), &mut fuzzer, &mut state, &mut mgr)?;
-
-    state.load_initial_inputs_forced(&mut fuzzer, &mut executor, &mut mgr, &[solution_dir])?;
-
-    let first_id = state.corpus().first().expect("Empty corpus");
-    state.set_corpus_id(first_id)?;
-
-    stages.perform_all(&mut fuzzer, &mut executor, &mut state, &mut mgr)?;
+    fuzzer.fuzz_loop(&mut executor, &mut state, &mut mgr)?;
 
     Ok(())
 }

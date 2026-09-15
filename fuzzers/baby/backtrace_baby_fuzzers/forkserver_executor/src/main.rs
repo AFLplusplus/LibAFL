@@ -6,14 +6,14 @@ use libafl::{
     executors::forkserver::ForkserverExecutor,
     feedback_and,
     feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     generators::RandPrintablesGenerator,
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
     observers::{AsanBacktraceObserver, ConstMapObserver, HitcountsMapObserver},
     schedulers::QueueScheduler,
-    stages::mutational::StdMutationalStage,
+    stages::StdMutationalStage,
     state::StdState,
 };
 #[cfg(not(target_vendor = "apple"))]
@@ -90,8 +90,12 @@ pub fn main() {
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = QueueScheduler::new();
 
+    // Setup a mutational stage with a basic bytes mutator
+    let mutator = HavocScheduledMutator::new(havoc_mutations());
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
+
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
     let mut executor = ForkserverExecutor::builder()
         .program("./target/release/program")
@@ -108,11 +112,7 @@ pub fn main() {
         .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
         .expect("Failed to generate the initial corpus");
 
-    // Setup a mutational stage with a basic bytes mutator
-    let mutator = HavocScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 }

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     HasMetadata,
     inputs::{BytesInput, HasTargetBytes},
-    stages::{Restartable, Stage},
+    stages::{Restartable, pull::Stage},
     state::{HasCorpus, HasCurrentTestcase},
 };
 

@@ -7,13 +7,13 @@ use libafl::{
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Evaluator, Fuzzer, StdFuzzer},
+    fuzzer::{Evaluator, StdFuzzer},
     inputs::{EncodedInput, InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder},
     monitors::SimpleMonitor,
     mutators::{encoded_mutations::encoded_mutations, scheduled::HavocScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::mutational::StdMutationalStage,
+    stages::StdMutationalStage,
     state::StdState,
 };
 use libafl_bolts::{rands::StdRand, tuples::tuple_list};
@@ -105,22 +105,22 @@ pub fn main() {
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueScheduler::new();
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
-    // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
-        &mut harness,
-        tuple_list!(observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the Executor");
-
     // Setup a mutational stage with a basic bytes mutator
     let mutator = HavocScheduledMutator::with_max_stack_pow(encoded_mutations(), 2);
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
+
+    // A fuzzer with feedbacks, a corpus scheduler, and stages
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
+
+    // Create the executor for an in-process function with just one observer
+    let mut executor = InProcessExecutor::builder()
+        .harness(&mut harness)
+        .observers(tuple_list!(observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()
+        .expect("Failed to create the Executor");
 
     println!("Decoder {:?} ...", encoder_decoder);
 
@@ -131,6 +131,6 @@ pub fn main() {
     }
 
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 }

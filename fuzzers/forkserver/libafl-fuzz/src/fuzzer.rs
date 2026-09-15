@@ -24,7 +24,7 @@ use libafl::{
     feedbacks::{
         CaptureTimeoutFeedback, ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback,
     },
-    fuzzer::StdFuzzer,
+    fuzzer::{Fuzzer, PullStdFuzzer as StdFuzzer},
     inputs::BytesInput,
     mutators::{havoc_mutations, tokens_mutations, AflppRedQueen, HavocScheduledMutator, Tokens},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
@@ -32,17 +32,15 @@ use libafl::{
         powersched::{BaseSchedule, PowerSchedule},
         IndexesLenTimeMinimizerScheduler, QueueScheduler, StdWeightedScheduler,
     },
-    stages::{
-        afl_stats::{AflStatsStage, CalibrationTime, FuzzTime, SyncTime},
-        mutational::MultiMutationalStage,
-        time_tracker::TimeTrackingStageWrapper,
-        CalibrationStage, ColorizationStage, IfStage, StagesTuple, StdMutationalStage,
-        StdPowerMutationalStage, SyncFromDiskStage, VerifyTimeoutsStage,
+    stages::pull::{
+        AflStatsStage, CalibrationStage, CalibrationTime, ColorizationStage, FuzzTime, IfStage,
+        MultiMutationalStage, StagesTuple, StdMutationalStage, StdPowerMutationalStage,
+        SyncFromDiskStage, SyncTime, TimeTrackingStageWrapper, VerifyTimeoutsStage,
     },
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasLastReportTime, HasStartTime, StdState,
     },
-    Error, Fuzzer, HasFeedback, HasMetadata, SerdeAny,
+    Error, HasFeedback, HasMetadata, SerdeAny,
 };
 #[cfg(not(feature = "fuzzbench"))]
 use libafl_bolts::shmem::{StdShMem, StdShMemProvider};

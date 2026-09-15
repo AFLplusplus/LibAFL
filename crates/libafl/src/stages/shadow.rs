@@ -17,7 +17,7 @@ use crate::{
     executors::{Executor, HasObservers, ShadowExecutor},
     mark_feature_time,
     observers::ObserversTuple,
-    stages::{Restartable, RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, pull::Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor},
 };

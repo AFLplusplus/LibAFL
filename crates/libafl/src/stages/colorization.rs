@@ -22,7 +22,7 @@ use crate::{
     mutators::mutations::buffer_copy,
     nonzero,
     observers::ObserversTuple,
-    stages::{Restartable, RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, pull::Stage},
     state::{HasCorpus, HasCurrentTestcase, HasRand},
 };
 

@@ -65,7 +65,7 @@ dynamic_layout = ["libafl_asan_layout/dynamic_layout"]
 nostd = []
 
 [dependencies]
-libafl_asan_layout = { path = "libafl_asan_layout" }
+libafl_asan_layout = { workspace = true }
 baby-mimalloc = { version = "0.2.1", default-features = false, features = [
   "spin_mutex",
 ], optional = true }

@@ -9,7 +9,7 @@ use libafl::{
     executors::{Executor, ExitKind, ShadowExecutor},
     feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Evaluator, Fuzzer, StdFuzzer},
+    fuzzer::{Evaluator, Fuzzer, PullStdFuzzer as StdFuzzer},
     inputs::{BytesInput, Input},
     mutators::{
         havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations, HavocScheduledMutator,
@@ -21,9 +21,9 @@ use libafl::{
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
-    stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, AflStatsStage, IfStage,
-        ShadowTracingStage, StagesTuple, StdMutationalStage,
+    stages::pull::{
+        AflStatsStage, CalibrationStage, IfStage, ShadowTracingStage, StagesTuple,
+        StdMutationalStage, StdPowerMutationalStage,
     },
     state::{HasCorpus, HasExecutions, HasSolutions, StdState},
     Error, HasMetadata,

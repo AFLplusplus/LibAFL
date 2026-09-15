@@ -100,6 +100,9 @@ pub unsafe extern "C" fn external_current_millis() -> u64 {
 
 #[cfg(feature = "std")]
 #[cfg(test)]
+pub(crate) static INPROCESS_TEST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[cfg(test)]
 mod tests {
 
     #[cfg(miri)]
@@ -118,7 +121,6 @@ mod tests {
         events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
-        fuzzer::Fuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
         mutators::{HavocScheduledMutator, mutations::BitFlipMutator},
@@ -130,6 +132,9 @@ mod tests {
     #[test]
     #[serial]
     fn test_fuzzer() {
+        let _inproc_guard = crate::INPROCESS_TEST_MUTEX
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         // # Safety
         // No concurrency per testcase
         #[cfg(miri)]
@@ -164,7 +169,9 @@ mod tests {
         let objective = ConstFeedback::new(false);
 
         let scheduler = RandScheduler::new();
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        let mutator = HavocScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
+        let stages = tuple_list!(StdMutationalStage::new(mutator));
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
         let mut harness = |_buf: &BytesInput| ExitKind::Ok;
         let mut executor = InProcessExecutor::builder()
@@ -176,12 +183,9 @@ mod tests {
             .build()
             .unwrap();
 
-        let mutator = HavocScheduledMutator::new(tuple_list!(BitFlipMutator::new()));
-        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
         for i in 0..1000 {
             fuzzer
-                .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
+                .fuzz_loop_for(&mut executor, &mut state, &mut event_manager, 1)
                 .unwrap_or_else(|err| panic!("Error in iter {i}: {err:?}"));
             if cfg!(miri) {
                 break;

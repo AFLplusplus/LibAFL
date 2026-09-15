@@ -21,7 +21,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     fuzzer::{Evaluator, EvaluatorObservers, ExecutionProcessor, HasObjective},
     inputs::{Input, InputConverter},
-    stages::{Restartable, RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, pull::Stage},
     state::{
         HasCorpus, HasCurrentTestcase, HasExecutions, HasRand, HasSolutions,
         MaybeHasClientPerfMonitor, Stoppable,

@@ -11,7 +11,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::mutations::ByteRandMutator,
@@ -160,13 +160,14 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         // Setup a mutator specifically for solving this crash
         // You probably want to use HavocScheduledMutator with a list instead
         let mutator = ByteRandMutator::new();
+        let stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
         let scheduler =
             IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
         let observers = tuple_list!(
             edges_observer,
@@ -209,9 +210,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        fuzzer.fuzz_loop(&mut executor, &mut state, &mut mgr)?;
 
         Ok(())
     };

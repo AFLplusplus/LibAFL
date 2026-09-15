@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     Error, Evaluator, HasMetadata,
     corpus::{Corpus, CorpusId},
-    stages::{Restartable, Stage},
+    stages::{Restartable, pull::Stage},
     state::{HasCorpus, HasSolutions},
 };
 

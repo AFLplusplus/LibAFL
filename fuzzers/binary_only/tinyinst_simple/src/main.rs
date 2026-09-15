@@ -11,7 +11,7 @@ use libafl::{
     schedulers::RandScheduler,
     stages::StdMutationalStage,
     state::StdState,
-    Fuzzer, StdFuzzer,
+    StdFuzzer,
 };
 #[cfg(unix)]
 use libafl_bolts::shmem::UnixShMemProvider;
@@ -57,7 +57,7 @@ fn main() {
     let mut objective = CrashFeedback::new();
     let mut state = StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
     let scheduler = RandScheduler::new();
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let fuzzer = StdFuzzer::without_stages(scheduler, feedback, objective);
 
     let monitor = SimpleMonitor::new(|x| println!("{x}"));
 
@@ -74,8 +74,9 @@ fn main() {
         .unwrap();
 
     let mutator = HavocScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
+    let mut fuzzer = fuzzer.with_stages(stages);
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut executor, &mut state, &mut mgr)
         .expect("error in fuzzing loop");
 }

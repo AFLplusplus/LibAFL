@@ -93,7 +93,8 @@ fn configure_qemu(
         // .arg("--disable-capstone")
         .arg("--disable-docs")
         .arg("--disable-tests")
-        .arg("--disable-tools");
+        .arg("--disable-tools")
+        .arg("--disable-werror");
 
     if cfg!(feature = "paranoid_debug") {
         cmd.arg("--enable-debug").arg("--enable-debug-tcg");

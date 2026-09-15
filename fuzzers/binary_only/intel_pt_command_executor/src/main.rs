@@ -18,13 +18,13 @@ use libafl::{
         hooks::intel_pt::{IntelPT, IntelPTHook, PtImage, PAGE_SIZE},
     },
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     generators::RandPrintablesGenerator,
     monitors::SimpleMonitor,
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
     observers::ConstMapObserver,
     schedulers::QueueScheduler,
-    stages::mutational::StdMutationalStage,
+    stages::StdMutationalStage,
     state::StdState,
 };
 use libafl_bolts::{core_affinity, nonnull_raw_mut, rands::StdRand, tuples::tuple_list, Error};
@@ -109,8 +109,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     // A queue policy to get testcases from the corpus
     let scheduler = QueueScheduler::new();
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::without_stages(scheduler, feedback, objective);
 
     // The target is a ET_DYN elf, it will be relocated by the loader with this offset.
     // see https://github.com/torvalds/linux/blob/c1e939a21eb111a6d6067b38e8e04b8809b64c4e/arch/x86/include/asm/elf.h#L234C1-L239C38
@@ -169,10 +168,11 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = HavocScheduledMutator::new(havoc_mutations());
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
+    let mut fuzzer = fuzzer.with_stages(stages);
 
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 
     Ok(())

@@ -11,13 +11,20 @@ use serde::{
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 
 #[allow(clippy::unsafe_derive_deserialize)]
-#[derive(Serialize, Debug)]
 /// An observer that shuts down the Frida helper upon crash
-/// This is necessary as we don't want to keep the instrumentation around when processing the crash
+#[derive(Serialize, Debug)]
 pub struct FridaHelperObserver<'a, RT> {
     #[serde(skip)]
     // helper: &'a RefCell<FridaInstrumentationHelper<'a, RT>>,
     helper: Rc<RefCell<FridaInstrumentationHelper<'a, RT>>>,
+}
+
+impl<'a, RT> Clone for FridaHelperObserver<'a, RT> {
+    fn clone(&self) -> Self {
+        Self {
+            helper: self.helper.clone(),
+        }
+    }
 }
 
 impl<'a, RT> FridaHelperObserver<'a, RT>

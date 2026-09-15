@@ -8,7 +8,7 @@ use libafl::{
     executors::ExitKind,
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{havoc_mutations::havoc_mutations, scheduled::HavocScheduledMutator},
@@ -227,11 +227,16 @@ pub fn fuzz() {
         });
 
         // A minimization+queue policy to get testcasess from the corpus
+        // Setup an havoc mutator with a mutational stage
+        let mutator = HavocScheduledMutator::new(havoc_mutations());
+        let stages = tuple_list!(StdMutationalStage::new(mutator));
+
+        // A minimization+queue policy to get testcasess from the corpus
         let scheduler =
             IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
         // Create a QEMU in-process executor
         let mut executor = QemuExecutor::new(
@@ -258,12 +263,8 @@ pub fn fuzz() {
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        // Setup an havoc mutator with a mutational stage
-        let mutator = HavocScheduledMutator::new(havoc_mutations());
-        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
         fuzzer
-            .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+            .fuzz_loop(&mut executor, &mut state, &mut mgr)
             .unwrap();
         Ok(())
     };

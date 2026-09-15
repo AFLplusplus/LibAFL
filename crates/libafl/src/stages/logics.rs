@@ -4,7 +4,10 @@ use core::marker::PhantomData;
 
 use crate::{
     Error,
-    stages::{Restartable, Stage, StageId, StagesTuple},
+    stages::{
+        Restartable, StageId,
+        pull::{Stage, StagesTuple},
+    },
     state::HasNestedStage,
 };
 
@@ -315,8 +318,8 @@ mod test {
         executors::nop::NopExecutor,
         inputs::BytesInputConverter,
         stages::{
-            ClosureStage, CorpusId, HasCurrentCorpusId, IfElseStage, IfStage, Restartable, Stage,
-            StagesTuple, WhileStage,
+            CorpusId, HasCurrentCorpusId, Restartable,
+            pull::{ClosureStage, IfElseStage, IfStage, Stage, StagesTuple, WhileStage},
         },
         state::{HasCurrentStageId, StdState},
     };

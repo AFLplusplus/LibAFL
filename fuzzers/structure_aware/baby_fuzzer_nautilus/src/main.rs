@@ -8,7 +8,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     generators::{NautilusContext, NautilusGenerator},
     inputs::{NautilusBytesConverter, NautilusInput},
     monitors::SimpleMonitor,
@@ -18,7 +18,7 @@ use libafl::{
     },
     observers::StdMapObserver,
     schedulers::QueueScheduler,
-    stages::{mutational::StdMutationalStage, DumpTargetBytesToDiskStage},
+    stages::StdMutationalStage,
     state::StdState,
     HasMetadata,
 };
@@ -91,62 +91,6 @@ pub fn main() {
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueScheduler::new();
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::builder()
-        .scheduler(scheduler)
-        .feedback(feedback)
-        .objective(objective)
-        .target_bytes_converter(NautilusBytesConverter::new(&ctx))
-        .build();
-
-    // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
-        &mut harness,
-        tuple_list!(observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the Executor");
-
-    let mut generator = NautilusGenerator::new(&ctx);
-
-    // Use this code to profile the generator performance
-    /*
-    use libafl::generators::Generator;
-    use std::collections::hash_map::DefaultHasher;
-    use std::collections::HashSet;
-    use std::hash::{Hash, Hasher};
-
-    fn calculate_hash<T: Hash>(t: &T) -> u64 {
-        let mut s = DefaultHasher::new();
-        t.hash(&mut s);
-        s.finish()
-    }
-
-    let mut set = HashSet::new();
-    let st = libafl_bolts::current_milliseconds();
-    let mut b = vec![];
-    let mut c = 0;
-    for _ in 0..100000 {
-        let i = generator.generate(&mut state).unwrap();
-        i.unparse(&context, &mut b);
-        set.insert(calculate_hash(&b));
-        c += b.len();
-    }
-    println!("{} / {}", c, libafl_bolts::current_milliseconds() - st);
-    println!("{} / 100000", set.len());
-
-    return;
-    */
-
-    // Generate 8 initial inputs
-    if state.must_load_initial_inputs() {
-        state
-            .generate_initial_inputs_forced(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
-            .expect("Failed to generate the initial corpus");
-    }
-
     // Setup a mutational stage with a basic bytes mutator
     let mutator = HavocScheduledMutator::with_max_stack_pow(
         tuple_list!(
@@ -163,12 +107,36 @@ pub fn main() {
         ),
         2,
     );
-    let mut stages = tuple_list!(
-        DumpTargetBytesToDiskStage::new("./corpus_bytes", "./solution_bytes").unwrap(),
-        StdMutationalStage::new(mutator)
-    );
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
+
+    // A fuzzer with feedbacks, a corpus scheduler, and stages
+    let mut fuzzer = StdFuzzer::builder()
+        .scheduler(scheduler)
+        .feedback(feedback)
+        .objective(objective)
+        .target_bytes_converter(NautilusBytesConverter::new(&ctx))
+        .build_with_stages(stages);
+
+    // Create the executor for an in-process function with just one observer
+    let mut executor = InProcessExecutor::builder()
+        .harness(&mut harness)
+        .observers(tuple_list!(observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()
+        .expect("Failed to create the Executor");
+
+    let mut generator = NautilusGenerator::new(&ctx);
+
+    // Generate 8 initial inputs
+    if state.must_load_initial_inputs() {
+        state
+            .generate_initial_inputs_forced(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
+            .expect("Failed to generate the initial corpus");
+    }
 
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 }

@@ -20,7 +20,7 @@ use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{Input, ToTargetBytesConverter},
     observers::ObserversTuple,
-    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
+    state::{HasCurrentTestcase, HasExecutions, HasInFlightExecutions, HasSolutions},
 };
 use libafl_bolts::tuples::RefIndexable;
 
@@ -61,7 +61,7 @@ impl<EM, H, I, OT, RT, S, Z> Executor<EM, I, S, Z>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
-    S: HasExecutions + HasCurrentTestcase<I> + HasSolutions<I>,
+    S: HasExecutions + HasCurrentTestcase<I> + HasSolutions<I> + HasInFlightExecutions<I>,
     OT: ObserversTuple<I, S>,
     RT: FridaRuntimeTuple,
     Z: ToTargetBytesConverter<I, S>,

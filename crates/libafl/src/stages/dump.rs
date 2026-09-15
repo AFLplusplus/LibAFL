@@ -20,7 +20,7 @@ use crate::{
     corpus::{Corpus, CorpusId, Testcase},
     fuzzer::HasToTargetBytesConverter,
     inputs::{Input, ToTargetBytesConverter},
-    stages::{Restartable, Stage},
+    stages::{Restartable, pull::Stage},
     state::{HasCorpus, HasRand, HasSolutions},
 };
 
@@ -107,8 +107,10 @@ where
 )] // for SerdeAny
 #[derive(Default, Serialize, Deserialize, Debug, Clone)]
 pub struct DumpToDiskMetadata {
-    last_corpus: Option<CorpusId>,
-    last_solution: Option<CorpusId>,
+    /// Last corpus ID dumped
+    pub last_corpus: Option<CorpusId>,
+    /// Last solution ID dumped
+    pub last_solution: Option<CorpusId>,
 }
 
 impl_serdeany!(DumpToDiskMetadata);

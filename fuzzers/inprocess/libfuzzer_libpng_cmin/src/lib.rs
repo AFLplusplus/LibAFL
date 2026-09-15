@@ -26,7 +26,7 @@ use libafl::{
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
-    stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage},
+    stages::{CalibrationStage, StdPowerMutationalStage},
     state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
@@ -92,7 +92,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
-    let calibration = CalibrationStage::new(&map_feedback);
+    let calibration = CalibrationStage::new();
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
@@ -142,7 +142,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
-    let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
+    let power: StdPowerMutationalStage<_, _, BytesInput, _> =
         StdPowerMutationalStage::new(mutator);
 
     let mut stages = tuple_list!(calibration, power);
@@ -158,7 +158,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     );
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
     // The wrapped harness function, calling out to the LLVM-style harness
     let mut harness = |input: &BytesInput| {
@@ -211,7 +211,6 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // However, you will lose a lot of performance that way.
     let iters = 10_000;
     fuzzer.fuzz_loop_for(
-        &mut stages,
         &mut executor,
         &mut state,
         &mut restarting_mgr,

@@ -13,7 +13,7 @@ use libafl::{
     },
     feedback_and_fast, feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::{Fuzzer, PullStdFuzzer as StdFuzzer},
     generators::RandBytesGenerator,
     inputs::BytesInput,
     monitors::MultiMonitor,
@@ -27,7 +27,7 @@ use libafl::{
     schedulers::{
         IndexesLenTimeMinimizerScheduler, StdWeightedScheduler, powersched::PowerSchedule,
     },
-    stages::{CalibrationStage, StdMutationalStage, StdPowerMutationalStage, TracingStage},
+    stages::pull::{CalibrationStage, StdMutationalStage, StdPowerMutationalStage, TracingStage},
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{

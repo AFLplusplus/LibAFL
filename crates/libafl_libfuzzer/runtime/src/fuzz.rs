@@ -12,13 +12,20 @@ use std::{
 #[cfg(feature = "tui_monitor")]
 use libafl::monitors::tui::TuiMonitor;
 use libafl::{
-    Error, Fuzzer, HasMetadata,
-    corpus::Corpus,
-    events::{EventReceiver, ProgressReporter, SimpleEventManager},
-    executors::ExitKind,
+    Error, HasMetadata, StdFuzzer,
+    corpus::{Corpus, HasCurrentCorpusId, HasTestcase},
+    events::{EventFirer, EventReceiver, ProgressReporter, SendExiting, SimpleEventManager},
+    executors::{Executor, ExitKind, HasObservers},
+    feedbacks::Feedback,
+    inputs::Input,
     monitors::MultiMonitor,
+    observers::ObserversTuple,
+    schedulers::Scheduler,
     stages::StagesTuple,
-    state::{HasCurrentStageId, HasExecutions, HasLastReportTime, HasSolutions, Stoppable},
+    state::{
+        HasCorpus, HasCurrentStageId, HasCurrentTestcase, HasExecutions, HasInFlightExecutions,
+        HasLastFoundTime, HasLastReportTime, HasSolutions, MaybeHasClientPerfMonitor, Stoppable,
+    },
 };
 #[cfg(unix)]
 use libafl::{
@@ -72,24 +79,35 @@ fn destroy_output_fds(options: &LibfuzzerOptions) {
     }
 }
 
-fn do_fuzz<F, ST, E, I, S, EM>(
+fn do_fuzz<CS, FB, OF, ST, IC, E, I, S, EM>(
     options: &LibfuzzerOptions,
-    fuzzer: &mut F,
-    stages: &mut ST,
+    fuzzer: &mut StdFuzzer<CS, FB, OF, ST, IC>,
     executor: &mut E,
     state: &mut S,
     mgr: &mut EM,
 ) -> Result<(), Error>
 where
-    F: Fuzzer<E, EM, I, S, ST>,
+    E: HasObservers + Executor<EM, I, S, StdFuzzer<CS, FB, OF, ST, IC>>,
+    E::Observers: ObserversTuple<I, S> + serde::Serialize + Debug,
+    EM: EventFirer<I, S> + SendExiting + ProgressReporter<S> + EventReceiver<I, S>,
+    I: Input + Clone,
     S: HasMetadata
-        + HasExecutions
+        + HasCorpus<I>
         + HasSolutions<I>
+        + HasExecutions
         + HasLastReportTime
+        + HasLastFoundTime
+        + HasCurrentCorpusId
         + HasCurrentStageId
+        + HasCurrentTestcase<I>
+        + HasInFlightExecutions<I>
+        + HasTestcase<I>
+        + MaybeHasClientPerfMonitor
         + Stoppable,
-    EM: ProgressReporter<S> + EventReceiver<I, S>,
-    ST: StagesTuple<E, EM, S, F>,
+    CS: Scheduler<I, S>,
+    FB: Feedback<EM, I, E::Observers, S>,
+    OF: Feedback<EM, I, E::Observers, S>,
+    ST: StagesTuple<EM, I, E::Observers, S>,
 {
     if let Some(solution) = state.solutions().last() {
         let kind = state
@@ -115,10 +133,10 @@ where
         }
     }
     if options.runs() == 0 {
-        fuzzer.fuzz_loop(stages, executor, state, mgr)?;
+        fuzzer.fuzz_loop(executor, state, mgr)?;
     } else {
         for _ in 0..options.runs() {
-            fuzzer.fuzz_one(stages, executor, state, mgr)?;
+            fuzzer.fuzz_one(executor, state, mgr)?;
         }
     }
     Ok(())

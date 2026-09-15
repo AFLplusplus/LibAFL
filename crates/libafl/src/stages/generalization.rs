@@ -24,7 +24,7 @@ use crate::{
     mark_feature_time,
     observers::{CanTrack, MapObserver, ObserversTuple},
     require_novelties_tracking,
-    stages::{Restartable, RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, pull::Stage},
     start_timer,
     state::{HasCorpus, HasExecutions, MaybeHasClientPerfMonitor},
 };

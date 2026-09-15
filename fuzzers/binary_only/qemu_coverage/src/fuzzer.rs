@@ -252,7 +252,7 @@ pub fn fuzz() {
         });
 
         let scheduler = QueueScheduler::new();
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, tuple_list!());
 
         let mut executor = QemuExecutor::new(
             emulator,

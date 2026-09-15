@@ -215,7 +215,7 @@ test-os-specific-fuzzers: (test-fuzzer "./fuzzers/inprocess/libfuzzer_windows_as
 # Tests the python fuzzer
 [linux]
 test-python-fuzzer:
-    sh -c ". {{ ROOT_DIR }}/bindings/pylibafl/.env/bin/activate && cd {{ FUZZERS_DIR }}/binary_only/python_qemu/ && python3 fuzzer.py 2>&1 | grepy 'Bye'"
+    sh -c ". {{ ROOT_DIR }}/bindings/pylibafl/.env/bin/activate && cd {{ FUZZERS_DIR }}/binary_only/python_qemu/ && python3 fuzzer.py 2>&1 | grep 'Bye'"
 
 # Builds the python bindings
 build-python:

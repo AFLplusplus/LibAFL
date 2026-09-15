@@ -7,23 +7,20 @@ use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
 use libafl::monitors::SimpleMonitor;
 use libafl::{
-    corpus::{InMemoryCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     mutators::{
-        HavocScheduledMutator, UnicodeCategoryRandMutator, UnicodeInput,
+        HavocScheduledMutator, UnicodeCategoryRandMutator,
         UnicodeSubcategoryRandMutator,
     },
     observers::ConstMapObserver,
     schedulers::QueueScheduler,
-    stages::{
-        mutational::StdMutationalStage, AflStatsStage, CalibrationStage, UnicodeIdentificationStage,
-    },
-    state::StdState,
-    Evaluator,
+    stages::{CalibrationStage, UnicodeMutationalStage},
+    state::{HasCorpus, StdState},
 };
 use libafl_bolts::{nonnull_raw_mut, rands::StdRand, tuples::tuple_list};
 
@@ -100,39 +97,8 @@ pub fn main() {
     // such as the notification of the addition of a new item to the corpus
     let mut mgr = SimpleEventManager::new(mon);
 
-    // A queue policy to get testcasess from the corpus
+    // A queue policy to get testcases from the corpus
     let scheduler = QueueScheduler::new();
-
-    let stats_stage = AflStatsStage::builder()
-        .report_interval(std::time::Duration::from_secs(1))
-        .map_feedback(&feedback)
-        .build()
-        .unwrap();
-
-    let calibration = CalibrationStage::new(&feedback);
-
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-
-    // Create the executor for an in-process function with just one observer
-    let mut executor = InProcessExecutor::new(
-        &mut harness,
-        tuple_list!(observer),
-        &mut fuzzer,
-        &mut state,
-        &mut mgr,
-    )
-    .expect("Failed to create the Executor");
-
-    // Generate 8 initial inputs
-    fuzzer
-        .evaluate_input(
-            &mut state,
-            &mut executor,
-            &mut mgr,
-            &BytesInput::new(vec![b'a']),
-        )
-        .unwrap();
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = HavocScheduledMutator::new(tuple_list!(
@@ -142,14 +108,30 @@ pub fn main() {
         UnicodeSubcategoryRandMutator,
         UnicodeSubcategoryRandMutator
     ));
-    let mut stages = tuple_list!(
-        calibration,
-        UnicodeIdentificationStage::new(),
-        StdMutationalStage::<_, _, UnicodeInput, BytesInput, _, _, _>::transforming(mutator),
-        stats_stage,
+    let stages = tuple_list!(
+        CalibrationStage::new(),
+        UnicodeMutationalStage::new(mutator),
     );
 
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
+
+    // Create the executor for an in-process function with just one observer
+    let mut executor = InProcessExecutor::builder()
+        .harness(&mut harness)
+        .observers(tuple_list!(observer))
+        .fuzzer(&mut fuzzer)
+        .state(&mut state)
+        .event_mgr(&mut mgr)
+        .build()
+        .expect("Failed to create the Executor");
+
+    // Add initial seed input to corpus
+    state
+        .corpus_mut()
+        .add(libafl::corpus::Testcase::new(BytesInput::new(vec![b'a'])))
+        .unwrap();
+
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 }

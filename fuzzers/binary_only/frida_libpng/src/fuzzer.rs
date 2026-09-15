@@ -11,7 +11,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
@@ -185,12 +185,28 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
         // Setup a basic mutator with a mutational stage
         let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
+        let tracing = ShadowTracingStage::new();
+
+        // Setup a randomic Input2State stage
+        let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+            I2SRandReplace::new()
+        )));
+
+        let stages = tuple_list!(
+            IfElseStage::new(
+                |_state: &mut _, _mgr: &mut _| Ok(is_cmplog(options, &client_description)),
+                tuple_list!(tracing, i2s),
+                tuple_list!()
+            ),
+            StdMutationalStage::new(mutator)
+        );
+
         // A minimization+queue policy to get testcasess from the corpus
         let scheduler =
             IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
-        // A fuzzer with feedbacks and a corpus scheduler
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        // A fuzzer with feedbacks, a corpus scheduler, and stages
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
         let observers = tuple_list!(
             frida_helper_observer,
@@ -217,13 +233,6 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
         let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
-        let tracing = ShadowTracingStage::new();
-
-        // Setup a randomic Input2State stage
-        let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
-            I2SRandReplace::new()
-        )));
-
         // In case the corpus is empty (on first run), reset
         if state.must_load_initial_inputs() {
             state
@@ -244,16 +253,7 @@ fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
-        let mut stages = tuple_list!(
-            IfElseStage::new(
-                |_, _, _, _| Ok(is_cmplog(options, &client_description)),
-                tuple_list!(tracing, i2s),
-                tuple_list!()
-            ),
-            StdMutationalStage::new(mutator)
-        );
-
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        fuzzer.fuzz_loop(&mut executor, &mut state, &mut mgr)?;
 
         Ok(())
     };

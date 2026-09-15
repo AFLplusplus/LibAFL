@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::observers::Observer;
 
 /// A simple observer with a list of things.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(bound = "T: Serialize + for<'a> Deserialize<'a>")]
 pub struct ListObserver<T> {
     name: Cow<'static, str>,

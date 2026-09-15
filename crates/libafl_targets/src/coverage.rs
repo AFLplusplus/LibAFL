@@ -240,7 +240,7 @@ mod swap {
     /// the AFL map in order to swap out the maps (and thus allow for map observing the two targets
     /// separately).
     #[expect(clippy::unsafe_derive_deserialize)]
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, Clone)]
     pub struct DifferentialAFLMapSwapObserver<'a, 'b> {
         first_map: OwnedMutSlice<'a, u8>,
         second_map: OwnedMutSlice<'b, u8>,

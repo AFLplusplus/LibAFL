@@ -1600,7 +1600,7 @@ mod tests {
             forkserver::{FAILED_TO_START_FORKSERVER_MSG, ForkserverExecutor},
         },
         feedbacks::{ConstFeedback, MaxMapFeedback},
-        fuzzer::{Fuzzer, StdFuzzer},
+        fuzzer::StdFuzzer,
         inputs::BytesInput,
         mutators::{HavocScheduledMutator, havoc_mutations},
         observers::{ConstMapObserver, HitcountsMapObserver},
@@ -1708,7 +1708,9 @@ mod tests {
 
         let mut mgr = NopEventManager::new();
         let scheduler = QueueScheduler::new();
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        let mutator = HavocScheduledMutator::new(havoc_mutations());
+        let stages = tuple_list!(StdMutationalStage::new(mutator));
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
         // Uses default kill signal (SIGTERM). This runtime's SIGTERM handler
         // does not exit and does not interrupt the blocked read, so the
@@ -1720,11 +1722,8 @@ mod tests {
             .build::<BytesInput, _, _>(tuple_list!(edges_observer))
             .expect("failed to start the forkserver against the instrumented target");
 
-        let mutator = HavocScheduledMutator::new(havoc_mutations());
-        let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
         fuzzer
-            .fuzz_loop_for(&mut stages, &mut executor, &mut state, &mut mgr, ITERS)
+            .fuzz_loop_for(&mut executor, &mut state, &mut mgr, ITERS)
             .expect("error in the fuzzing loop");
 
         // The teardown happens on this thread. A watchdog thread fails the

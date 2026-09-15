@@ -292,7 +292,10 @@ impl<'a, EM, ES, H, OT, S, Z>
     where
         H: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
         OT: ObserversTuple<I, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+        S: HasExecutions
+            + HasSolutions<I>
+            + HasCurrentTestcase<I>
+            + crate::state::HasInFlightExecutions<I>,
         I: Clone + Input,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
@@ -512,7 +515,10 @@ impl<'a, EM, ES, HB, HT, OT, S, Z>
         HB: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
         HT: ExecutorHooksTuple<I, S>,
         OT: ObserversTuple<I, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+        S: HasExecutions
+            + HasSolutions<I>
+            + HasCurrentTestcase<I>
+            + crate::state::HasInFlightExecutions<I>,
         I: Clone + Input,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
@@ -531,7 +537,10 @@ impl<'a, EM, ES, HB, HT, OT, S, Z>
         HB: BorrowMut<H>,
         HT: ExecutorHooksTuple<I, S>,
         OT: ObserversTuple<I, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+        S: HasExecutions
+            + HasSolutions<I>
+            + HasCurrentTestcase<I>
+            + crate::state::HasInFlightExecutions<I>,
         I: Clone + Input,
         EM: EventFirer<I, S> + EventRestarter<S>,
         OF: Feedback<EM, I, OT, S>,
@@ -580,7 +589,10 @@ impl<EM, ES, H, I, OT, S, Z> StatefulInProcessExecutor<EM, ES, H, I, OT, S, Z>
 where
     H: FnMut(&mut ES, &mut S, &I) -> ExitKind + Sized,
     OT: ObserversTuple<I, S>,
-    S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+    S: HasExecutions
+        + HasSolutions<I>
+        + HasCurrentTestcase<I>
+        + crate::state::HasInFlightExecutions<I>,
     I: Clone + Input,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
@@ -661,6 +673,13 @@ impl<EM, ES, H, HB, HT, I, OT, S, Z>
     pub fn executor_state_mut(&mut self) -> &mut ES {
         &mut self.executor_state
     }
+
+    /// Retrieve the state, consuming the executor.
+    #[inline]
+    #[must_use]
+    pub fn into_state(self) -> ES {
+        self.executor_state
+    }
 }
 
 impl<EM, ES, H, HB, HT, I, OT, S, Z>
@@ -671,7 +690,10 @@ where
     HT: ExecutorHooksTuple<I, S>,
     I: Input + Clone,
     OT: ObserversTuple<I, S>,
-    S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+    S: HasExecutions
+        + HasSolutions<I>
+        + HasCurrentTestcase<I>
+        + crate::state::HasInFlightExecutions<I>,
 {
     /// Create a new in mem executor with the default timeout (5 sec)
     #[deprecated(
@@ -769,13 +791,6 @@ where
     #[must_use]
     pub fn hooks_mut(&mut self) -> &mut (InProcessHooks<I, S>, HT) {
         self.inner.hooks_mut()
-    }
-
-    /// Retrieve the state, consuming the executor.
-    #[inline]
-    #[must_use]
-    pub fn into_state(self) -> ES {
-        self.executor_state
     }
 }
 

@@ -14,7 +14,7 @@ use crate::{
     executors::{Executor, HasObservers, SetTimeout},
     inputs::BytesInput,
     observers::ObserversTuple,
-    stages::{Restartable, Stage},
+    stages::{Restartable, pull::Stage},
 };
 
 /// Stage that re-runs inputs deemed as timeouts with double the timeout to assert that they are

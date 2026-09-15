@@ -58,7 +58,7 @@ impl CMainArgsBuilder {
 
         Ok(CMainArgs {
             use_stdin: self.use_stdin(),
-            argv,
+            _argv: argv,
             argv_ptr,
         })
     }
@@ -66,11 +66,10 @@ impl CMainArgsBuilder {
 
 /// For creating an C-compatible argument
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct CMainArgs {
     use_stdin: bool,
     /// This guys have to sit here, else Rust will free them
-    argv: Vec<Pin<Box<CString>>>,
+    _argv: Vec<Pin<Box<CString>>>,
     argv_ptr: Vec<*const c_char>,
 }
 

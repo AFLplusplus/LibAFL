@@ -609,6 +609,16 @@ pub enum AsanErrorsObserver {
     Static,
 }
 
+impl Clone for AsanErrorsObserver {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Ptr(OwnedPtr::Ptr(p)) => Self::Ptr(OwnedPtr::Ptr(*p)),
+            Self::Ptr(OwnedPtr::Owned(b)) => Self::Ptr(OwnedPtr::Owned(Box::new((**b).clone()))),
+            Self::Static => Self::Static,
+        }
+    }
+}
+
 impl<I, S> Observer<I, S> for AsanErrorsObserver {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         AsanErrors::get_mut_blocking().clear();

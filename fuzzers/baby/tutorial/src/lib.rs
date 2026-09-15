@@ -17,9 +17,9 @@ use libafl::{
     monitors::MultiMonitor,
     observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{powersched::PowerSchedule, PowerQueueScheduler},
-    stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage},
+    stages::{CalibrationStage, StdPowerMutationalStage},
     state::{HasCorpus, StdState},
-    Error, Fuzzer,
+    Error,
 };
 use libafl_bolts::{rands::StdRand, tuples::tuple_list};
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer};
@@ -93,7 +93,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
-    let calibration = CalibrationStage::new(&map_feedback);
+    let calibration = CalibrationStage::new();
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
@@ -132,19 +132,18 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Setup a lain mutator with a mutational stage
     let mutator = LainMutator::new();
 
-    let power: StdPowerMutationalStage<_, _, PacketData, _, _, _> =
+    let power: StdPowerMutationalStage<_, _, PacketData, _> =
         StdPowerMutationalStage::new(mutator);
 
-    let mut stages = tuple_list!(calibration, power);
+    let stages = tuple_list!(calibration, power);
 
-    // A minimization+queue policy to get testcasess from the corpus
+    // A minimization+queue policy to get testcases from the corpus
     let scheduler = PacketLenMinimizerScheduler::new(
         &edges_observer,
         PowerQueueScheduler::new(&mut state, &edges_observer, PowerSchedule::fast()),
     );
 
-    // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let mut executor = InProcessExecutor::builder()
@@ -165,26 +164,21 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // In case the corpus is empty (on first run), reset
     if state.must_load_initial_inputs() {
-        state
-            .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, corpus_dirs)
-            .unwrap_or_else(|err| {
-                panic!("Failed to load initial corpus at {corpus_dirs:?}: {err}")
-            });
+        for corpus_dir in corpus_dirs {
+            for entry in std::fs::read_dir(corpus_dir)? {
+                let entry = entry?;
+                if entry.file_type()?.is_file() {
+                    let _bytes = std::fs::read(entry.path())?;
+                    let input = PacketData::default();
+                    state.corpus_mut().add(libafl::corpus::Testcase::new(input))?;
+                }
+            }
+        }
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    // This fuzzer restarts after 1 mio `fuzz_one` executions.
-    // Each fuzz_one will internally do many executions of the target.
-    // If your target is very instable, setting a low count here may help.
-    // However, you will lose a lot of performance that way.
     let iters = 1_000_000;
-    fuzzer.fuzz_loop_for(
-        &mut stages,
-        &mut executor,
-        &mut state,
-        &mut restarting_mgr,
-        iters,
-    )?;
+    fuzzer.fuzz_loop_for(&mut executor, &mut state, &mut restarting_mgr, iters)?;
 
     // It's important, that we store the state before restarting!
     // Else, the parent will not respawn a new child and quit.

@@ -13,8 +13,9 @@ use crate::{
     mutators::{MutationResult, Mutator},
     nonzero,
     stages::{
-        ExecutionCountRestartHelper, MutationalStage, Restartable, Stage,
+        ExecutionCountRestartHelper, MutationalStage, Restartable,
         mutational::{DEFAULT_MUTATIONAL_MAX_ITERATIONS, MutatedTransform, MutatedTransformPost},
+        pull::Stage,
     },
     start_timer,
     state::{HasCurrentTestcase, HasExecutions, HasRand, MaybeHasClientPerfMonitor},
@@ -24,10 +25,13 @@ use crate::{
     any(not(feature = "serdeany_autoreg"), miri),
     expect(clippy::unsafe_derive_deserialize)
 )] // for SerdeAny
+/// Metadata for configuring tuneable mutational stage parameters.
 #[derive(Default, Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-struct TuneableMutationalStageMetadata {
-    iters: Option<u64>,
-    fuzz_time: Option<Duration>,
+pub struct TuneableMutationalStageMetadata {
+    /// Configured iterations count
+    pub iters: Option<u64>,
+    /// Configured fuzz time
+    pub fuzz_time: Option<Duration>,
 }
 
 impl_serdeany!(TuneableMutationalStageMetadata);

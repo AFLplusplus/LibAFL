@@ -18,7 +18,7 @@ use libafl::{
     },
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{
@@ -30,8 +30,7 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
-        TracingStage,
+        pull::TracingStage, CalibrationStage, StdMutationalStage, StdPowerMutationalStage,
     },
     state::{HasCorpus, StdState},
     Error, HasMetadata,
@@ -275,7 +274,7 @@ fn fuzz(
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
-    let calibration = CalibrationStage::new(&map_feedback);
+    let calibration = CalibrationStage::new();
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
@@ -316,8 +315,7 @@ fn fuzz(
         5,
     )?;
 
-    let power: StdPowerMutationalStage<_, _, BytesInput, _, _, _> =
-        StdPowerMutationalStage::new(mutator);
+    let power = StdPowerMutationalStage::new(mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(
@@ -331,7 +329,7 @@ fn fuzz(
     let edge_handle = edges_observer.handle();
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::without_stages(scheduler, feedback, objective);
 
     let mut tokens = Tokens::new();
     let mut executor = ForkserverExecutor::builder()
@@ -432,14 +430,16 @@ fn fuzz(
         )));
 
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, tracing, i2s, power);
+        let stages = tuple_list!(calibration, tracing, i2s, power);
+        let mut fuzzer = fuzzer.with_stages(stages);
 
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        fuzzer.fuzz_loop(&mut executor, &mut state, &mut mgr)?;
     } else {
         // The order of the stages matter!
-        let mut stages = tuple_list!(calibration, power);
+        let stages = tuple_list!(calibration, power);
+        let mut fuzzer = fuzzer.with_stages(stages);
 
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        fuzzer.fuzz_loop(&mut executor, &mut state, &mut mgr)?;
     }
 
     // Never reached

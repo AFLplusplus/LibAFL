@@ -25,7 +25,7 @@ use crate::{
     },
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
-    stages::{Restartable, RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, pull::Stage},
     state::{HasCorpus, HasCurrentTestcase, HasExecutions},
 };
 
@@ -467,6 +467,7 @@ mod tests {
     use libafl_bolts::serdeany::RegistryBuilder;
     use libafl_bolts::{Error, rands::StdRand};
 
+    use super::CalibrationStage;
     #[cfg(not(feature = "serdeany_autoreg"))]
     use super::DisabledInCalibrationStageMetadata;
     use crate::{
@@ -474,7 +475,7 @@ mod tests {
         feedbacks::{MaxMapFeedback, StateInitializer},
         inputs::NopInput,
         observers::StdMapObserver,
-        stages::{CalibrationStage, Restartable},
+        stages::Restartable,
         state::{HasCorpus, StdState},
     };
 

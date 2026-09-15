@@ -12,25 +12,28 @@ use clap::{Arg, Command};
 use libafl::{
     corpus::{Corpus, InMemoryOnDiskCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{inprocess::InProcessExecutor, ExitKind},
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{havoc_mutations, token_mutations::AflppRedQueen, HavocScheduledMutator},
     observers::{CanTrack, HitcountsMapObserver},
     schedulers::QueueScheduler,
-    stages::{mutational::MultiMutationalStage, ColorizationStage, IfStage, StdMutationalStage},
+    stages::{
+        AflppCmplogTracingStage, ColorizationStage, IfStage, MultiMutationalStage,
+        StdMutationalStage,
+    },
     state::{HasCorpus, HasCurrentTestcase, StdState},
     Error,
 };
 use libafl_bolts::{
     ownedref::OwnedRefMut,
     rands::StdRand,
-    tuples::{tuple_list, Handled},
+    tuples::tuple_list,
 };
 use libafl_targets::{
-    cmps::{observers::AflppCmpLogObserver, stages::AflppCmplogTracingStage},
+    cmps::observers::AflppCmpLogObserver,
     libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CMPLOG_MAP_EXTENDED,
 };
 
@@ -161,11 +164,34 @@ fn run_fuzzer(
     let mutator = HavocScheduledMutator::new(havoc_mutations());
     let mutational_stage = StdMutationalStage::new(mutator);
 
+    /*
+    RedQueen's colorization stage needs a reference to edges_observer
+    */
+    let colorization = ColorizationStage::new(&edges_observer);
+    let tracing = AflppCmplogTracingStage::new();
+
+    // Setup a randomic Input2State stage
+    let rq: MultiMutationalStage<_, BytesInput> =
+        MultiMutationalStage::new(AflppRedQueen::with_cmplog_options(true, true));
+
+    // We'll only run the cmplog stuff (run colorization, enable comparison tracing, then do mutations based on those) when a test case is on its second schedule
+    let cb = |state: &mut StdState<InMemoryOnDiskCorpus<_>, _, _, _>,
+              _event_manager: &mut _|
+     -> Result<bool, Error> {
+        let testcase = state.current_testcase()?;
+        let res = testcase.scheduled_count() == 1; // let's try on the 2nd trial
+
+        Ok(res)
+    };
+    let cmplog = IfStage::new(cb, tuple_list!(colorization, tracing, rq));
+
+    let stages = tuple_list!(cmplog, mutational_stage);
+
     // queue policy to get testcasess from the corpus
     let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
     // The wrapped harness function, calling out to the LLVM-style harness
     fn harness(input: &BytesInput) -> ExitKind {
@@ -177,15 +203,9 @@ fn run_fuzzer(
         ExitKind::Ok
     }
     let mut harness_main: fn(&BytesInput) -> ExitKind = harness;
-    let mut harness_cmplog: fn(&BytesInput) -> ExitKind = harness;
-
-    /*
-    RedQueen's colorization stage needs a reference to edges_observer
-    */
-    let colorization = ColorizationStage::new(&edges_observer);
 
     // Create the executor for an in-process function with one observer for edge coverage
-    let mut executor = InProcessExecutor::builder()
+    let executor = InProcessExecutor::builder()
         .timeout(timeout)
         .harness(&mut harness_main)
         .observers(tuple_list!(edges_observer))
@@ -194,42 +214,9 @@ fn run_fuzzer(
         .event_mgr(&mut mgr)
         .build()?;
 
-    // Now, we'll setup the rest of the RedQueen stages. We need the cmplog map,
-    // an executor that populates it, and observer for it, and the
-    // colorization/tracing stages .
-
     let cmpmap_ref = unsafe { OwnedRefMut::from_mut_ptr(&raw mut CMPLOG_MAP_EXTENDED) };
     let cmplog_observer = AflppCmpLogObserver::new("cmplog", cmpmap_ref, true);
-    let cmplog_ref = cmplog_observer.handle();
-    let cmplog_executor = InProcessExecutor::builder()
-        .timeout(timeout)
-        .harness(&mut harness_cmplog)
-        .observers(tuple_list!(cmplog_observer))
-        .fuzzer(&mut fuzzer)
-        .state(&mut state)
-        .event_mgr(&mut mgr)
-        .build()?;
-
-    let tracing = AflppCmplogTracingStage::new(cmplog_executor, cmplog_ref);
-
-    // Setup a randomic Input2State stage
-    let rq: MultiMutationalStage<_, _, BytesInput, _, _, _> =
-        MultiMutationalStage::new(AflppRedQueen::with_cmplog_options(true, true));
-
-    // We'll only run the cmplog stuff (run colorization, enable comparison tracing, then do mutations based on those) when a test case is on its second schedule
-    let cb = |_fuzzer: &mut _,
-              _executor: &mut _,
-              state: &mut StdState<InMemoryOnDiskCorpus<_>, _, _, _>,
-              _event_manager: &mut _|
-     -> Result<bool, Error> {
-        let testcase = state.current_testcase()?;
-        let res = testcase.scheduled_count() == 1; // let's try on the 2nd trial
-
-        Ok(res)
-    };
-    let cmplog = IfStage::new(cb, tuple_list!(colorization, tracing, rq));
-
-    let mut stages = tuple_list!(cmplog, mutational_stage);
+    let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
     state
         .load_initial_inputs(
@@ -244,7 +231,7 @@ fn run_fuzzer(
         });
     println!("We imported {} inputs from disk.", state.corpus().count());
 
-    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+    fuzzer.fuzz_loop(&mut executor, &mut state, &mut mgr)?;
 
     Ok(())
 }

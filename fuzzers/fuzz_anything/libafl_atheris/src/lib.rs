@@ -17,7 +17,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
@@ -28,7 +28,7 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::{ShadowTracingStage, StdMutationalStage, TracingStage},
+    stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
@@ -38,7 +38,6 @@ use libafl_bolts::{
     rands::StdRand,
     shmem::{ShMemProvider, StdShMemProvider},
     tuples::{tuple_list, Merge},
-    AsSlice,
 };
 use libafl_targets::{extra_counters, CmpLogObserver};
 
@@ -183,17 +182,32 @@ pub extern "C" fn LLVMFuzzerRunDriver(
                 .expect("Could not read tokens files.")
         });
 
+        // Setup a tracing stage in which we log comparisons
+        let tracing = ShadowTracingStage::new();
+
+        // Setup a randomic Input2State stage
+        let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
+            I2SRandReplace::new()
+        )));
+
+        // Setup a basic mutator
+        let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
+        let mutational = StdMutationalStage::new(mutator);
+
+        // The order of the stages matter!
+        let stages = tuple_list!(tracing, i2s, mutational);
+
         // A minimization+queue policy to get testcasess from the corpus
         let scheduler =
             IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
-        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |input: &BytesInput| {
             let target = input.target_bytes();
-            let buf = target.as_slice();
+            let buf = &target[..];
             harness_fn(buf.as_ptr(), buf.len());
             ExitKind::Ok
         };
@@ -208,29 +222,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
             .event_mgr(&mut mgr)
             .build()?;
 
-        // Secondary harness due to mut ownership
-        let mut harness = |input: &BytesInput| {
-            let target = input.target_bytes();
-            let buf = target.as_slice();
-            harness_fn(buf.as_ptr(), buf.len());
-            ExitKind::Ok
-        };
-
         let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
-        // Setup a tracing stage in which we log comparisons
-        let tracing = ShadowTracingStage::new();
-
-        // Setup a randomic Input2State stage
-        let i2s = StdMutationalStage::new(HavocScheduledMutator::new(tuple_list!(
-            I2SRandReplace::new()
-        )));
-
-        // Setup a basic mutator
-        let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-        let mutational = StdMutationalStage::new(mutator);
-
-        // The order of the stages matter!
-        let mut stages = tuple_list!(tracing, i2s, mutational);
 
         // In case the corpus is empty (on first run), reset
         if state.must_load_initial_inputs() {
@@ -265,7 +257,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
             }
         }
 
-        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+        fuzzer.fuzz_loop(&mut executor, &mut state, &mut mgr)?;
         Ok(())
     };
 

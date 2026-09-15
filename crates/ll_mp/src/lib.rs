@@ -632,6 +632,7 @@ unsafe fn llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow
 /// # Safety
 /// Will dereference `last_msg`
 #[inline]
+#[expect(clippy::cast_ptr_alignment)]
 unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
     map: &mut LlmpSharedMap<SHM>,
     last_msg: *const LlmpMsg,
@@ -640,17 +641,24 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
     unsafe {
         let page = map.page_mut();
         let map_size = map.shmem.len();
-        let msg_begin_min = (page as *const u8).add(size_of::<LlmpPage>());
-        // We still need space for this msg (alloc_size).
-        let msg_begin_max = (page as *const u8).add(map_size - alloc_size);
-        let next = llmp_next_msg_ptr(last_msg);
-        let next_ptr = next as *const u8;
-        if next_ptr >= msg_begin_min && next_ptr <= msg_begin_max {
-            Ok(next)
+        if alloc_size > map_size {
+            return Err(Error::illegal_state(format!(
+                "alloc_size ({alloc_size}) exceeds map_size ({map_size})"
+            )));
+        }
+        let page_addr = page as usize;
+        let last_msg_addr = last_msg as usize;
+        let msg_begin_min = page_addr.saturating_add(size_of::<LlmpPage>());
+        let msg_begin_max = page_addr.saturating_add(map_size - alloc_size);
+        let next_addr = last_msg_addr
+            .checked_add(size_of::<LlmpMsg>())
+            .and_then(|a| a.checked_add((*last_msg).buf_len_padded as usize))
+            .ok_or_else(|| Error::illegal_state("Overflow computing next LLMP message pointer"))?;
+        if next_addr >= msg_begin_min && next_addr <= msg_begin_max {
+            Ok((page as *mut u8).add(next_addr - page_addr) as *mut LlmpMsg)
         } else {
             Err(Error::illegal_state(format!(
-                "Inconsistent data on sharedmap, or Bug (next_ptr was {:x}, sharedmap page was {:x})",
-                next_ptr as usize, page as usize
+                "Inconsistent data on sharedmap, or Bug (next_ptr was {next_addr:x}, sharedmap page was {page_addr:x})"
             )))
         }
     }
@@ -738,16 +746,13 @@ impl LlmpMsg {
     /// Gets the buffer from this message as slice, with the correct length.
     #[inline]
     pub fn try_as_slice<SHM: ShMem>(&self, map: &LlmpSharedMap<SHM>) -> Result<&[u8], Error> {
-        // # Safety
-        // Safe because we check if we're in a valid shmem region first.
-        unsafe {
-            if self.in_shmem(map) {
-                Ok(self.as_slice_unsafe())
-            } else {
-                Err(Error::illegal_state(
-                    "Current message not in page. The sharedmap get tampered with or we have a BUG.",
-                ))
-            }
+        let len = unsafe { ptr::read_volatile(&raw const self.buf_len) };
+        if self.in_shmem_with_len(map, len) {
+            unsafe { Ok(slice::from_raw_parts(self.buf.as_ptr(), len as usize)) }
+        } else {
+            Err(Error::illegal_state(
+                "Current message not in page. The sharedmap get tampered with or we have a BUG.",
+            ))
         }
     }
 
@@ -757,20 +762,31 @@ impl LlmpMsg {
         &mut self,
         map: &mut LlmpSharedMap<SHM>,
     ) -> Result<&mut [u8], Error> {
-        unsafe {
-            if self.in_shmem(map) {
-                Ok(self.as_slice_mut_unsafe())
-            } else {
-                Err(Error::illegal_state(
-                    "Current message not in page. The sharedmap get tampered with or we have a BUG.",
+        let len = unsafe { ptr::read_volatile(&raw const self.buf_len) };
+        if self.in_shmem_with_len(map, len) {
+            unsafe {
+                Ok(slice::from_raw_parts_mut(
+                    self.buf.as_mut_ptr(),
+                    len as usize,
                 ))
             }
+        } else {
+            Err(Error::illegal_state(
+                "Current message not in page. The sharedmap get tampered with or we have a BUG.",
+            ))
         }
     }
 
     /// Returns `true`, if the pointer is, indeed, in the page of this shared map.
     #[inline]
     pub fn in_shmem<SHM: ShMem>(&self, map: &LlmpSharedMap<SHM>) -> bool {
+        let len = unsafe { ptr::read_volatile(&raw const self.buf_len) };
+        self.in_shmem_with_len(map, len)
+    }
+
+    /// Returns `true` if the message with a specific `buf_len` lies within the shared map.
+    #[inline]
+    pub fn in_shmem_with_len<SHM: ShMem>(&self, map: &LlmpSharedMap<SHM>, buf_len: u64) -> bool {
         let msg_addr = ptr::from_ref(self) as usize;
         let page_addr = unsafe { map.page() } as usize;
         let map_size = map.shmem.len();
@@ -793,8 +809,9 @@ impl LlmpMsg {
         }
 
         let max_buf_len = (map_size - header_end) as u64;
+        let buf_len_padded = unsafe { ptr::read_volatile(&raw const self.buf_len_padded) };
 
-        self.buf_len <= self.buf_len_padded && self.buf_len_padded <= max_buf_len
+        buf_len <= buf_len_padded && buf_len_padded <= max_buf_len
     }
 }
 
@@ -4005,6 +4022,7 @@ mod tests {
         let arr: [u8; 1] = [1_u8];
         // Send stuff
         client.send_buf(tag, &arr).unwrap();
+        broker.broker_once().unwrap();
 
         // # Safety
         // Test only. Should run one instance.
@@ -4019,13 +4037,15 @@ mod tests {
         }
 
         /* recreate the client from env, check if it still works */
-        client = LlmpClient::on_existing_from_env(shmem_provider, "_ENV_TEST").unwrap();
+        let mut recreated_client =
+            LlmpClient::on_existing_from_env(shmem_provider, "_ENV_TEST").unwrap();
 
-        client.send_buf(tag, &arr).unwrap();
+        recreated_client.send_buf(tag, &arr).unwrap();
 
         // Forward stuff to clients
         broker.broker_once().unwrap();
-        let (_sender_id, tag2, arr2) = client.recv_buf_blocking().unwrap();
+        recreated_client.sender_mut().id = ClientId(0);
+        let (_sender_id, tag2, arr2) = recreated_client.recv_buf().unwrap().unwrap();
         assert_eq!(tag, tag2);
         assert_eq!(arr[0], arr2[0]);
 
@@ -4256,13 +4276,16 @@ mod tests {
             IsClient { client } => client,
         };
 
+        sleep(Duration::from_millis(100));
         broker.broker_once().unwrap();
 
         let tag1 = Tag(0x1111);
         let payload1 = [0x11_u8];
         client.send_buf(tag1, &payload1).unwrap();
         broker.broker_once().unwrap();
-        let (_sender_id, _tag, _recv_payload) = client.recv_buf_blocking().unwrap();
+        client.sender_mut().id = ClientId(0);
+        let (_sender_id, _tag, _recv_payload) = client.recv_buf().unwrap().unwrap();
+        client.sender_mut().id = ClientId(1);
 
         let last_sent_msg = client.sender().last_msg_sent;
         let last_sent_offset = if last_sent_msg.is_null() {
@@ -4314,7 +4337,8 @@ mod tests {
         resumed_client.send_buf(tag2, &payload2).unwrap();
 
         broker.broker_once().unwrap();
-        let (_sender_id2, recvd_tag2, recvd_payload2) = resumed_client.recv_buf_blocking().unwrap();
+        resumed_client.sender_mut().id = ClientId(0);
+        let (_sender_id2, recvd_tag2, recvd_payload2) = resumed_client.recv_buf().unwrap().unwrap();
         assert_eq!(tag2, recvd_tag2);
         assert_eq!(payload2[0], recvd_payload2[0]);
     }

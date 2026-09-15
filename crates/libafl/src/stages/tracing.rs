@@ -17,7 +17,7 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
-    stages::{Restartable, RetryCountRestartHelper, Stage},
+    stages::{Restartable, RetryCountRestartHelper, pull::Stage},
     start_timer,
     state::{HasCorpus, HasCurrentTestcase, HasExecutions, MaybeHasClientPerfMonitor},
 };
@@ -25,9 +25,10 @@ use crate::{
 /// A stage that runs a tracer executor
 /// This should *NOT* be used with inprocess executor
 #[derive(Debug, Clone)]
-pub struct TracingStage<EM, I, TE, S, Z> {
+pub struct TracingStage<EM, I, TE, S, Z = crate::fuzzer::NopFuzzer> {
     name: Cow<'static, str>,
     tracer_executor: TE,
+    done: bool,
     phantom: PhantomData<(EM, I, TE, S, Z)>,
 }
 
@@ -133,6 +134,7 @@ impl<EM, I, TE, S, Z> TracingStage<EM, I, TE, S, Z> {
         Self {
             name: Cow::Owned(TRACING_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_ref()),
             tracer_executor,
+            done: false,
             phantom: PhantomData,
         }
     }
@@ -145,5 +147,42 @@ impl<EM, I, TE, S, Z> TracingStage<EM, I, TE, S, Z> {
     /// Gets the underlying tracer executor (mut)
     pub fn executor_mut(&mut self) -> &mut TE {
         &mut self.tracer_executor
+    }
+}
+
+impl<EM, I, OT, S, TE> crate::stages::push::PushStage<EM, I, OT, S>
+    for TracingStage<EM, I, TE, S, crate::fuzzer::NopFuzzer>
+where
+    TE: Executor<EM, I, S, crate::fuzzer::NopFuzzer> + HasObservers,
+    TE::Observers: ObserversTuple<I, S>,
+    S: HasExecutions
+        + HasCorpus<I>
+        + HasNamedMetadata
+        + HasCurrentTestcase<I>
+        + MaybeHasClientPerfMonitor,
+    I: Input + Clone,
+{
+    fn init(&mut self, _state: &mut S, _manager: &mut EM) -> Result<(), Error> {
+        self.done = false;
+        Ok(())
+    }
+
+    fn step(
+        &mut self,
+        state: &mut S,
+        manager: &mut EM,
+    ) -> Result<crate::stages::push::StageStep<I>, Error> {
+        if self.done {
+            return Ok(crate::stages::push::StageStep::Done);
+        }
+        self.done = true;
+        let mut fuzzer = crate::fuzzer::NopFuzzer::new();
+        self.trace(&mut fuzzer, state, manager)?;
+        Ok(crate::stages::push::StageStep::Done)
+    }
+
+    fn deinit(&mut self, _state: &mut S, _manager: &mut EM) -> Result<(), Error> {
+        self.done = false;
+        Ok(())
     }
 }

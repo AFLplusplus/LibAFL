@@ -135,8 +135,7 @@ fn create_lua_fn<S: HasRand>(
 /// Inserts a random token at a random position in the `Input`.
 pub struct LuaMutator {
     /// The Lua VM
-    #[allow(dead_code)] // We need to keep a handle around.
-    lua: Lua,
+    _lua: Lua,
     /// The function string we loaded
     func: String,
     /// The actual lua function we can call
@@ -179,7 +178,7 @@ impl LuaMutator {
             true,
         )?;
         Ok(Self {
-            lua,
+            _lua: lua,
             func,
             mutator,
             timeout_handler_called_once: timeouted_once,
@@ -201,7 +200,7 @@ impl LuaMutator {
             true,
         )?;
         Ok(Self {
-            lua,
+            _lua: lua,
             func,
             mutator,
             timeout_handler_called_once: timeouted_once,

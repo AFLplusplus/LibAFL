@@ -69,7 +69,6 @@ mod arrays {
     use alloc::{boxed::Box, fmt, vec::Vec};
     use core::{convert::TryInto, marker::PhantomData};
 
-    use libafl_core::format;
     use serde::{
         Deserialize, Deserializer,
         de::{SeqAccess, Visitor},
@@ -84,7 +83,7 @@ mod arrays {
         type Value = Box<[T; N]>;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str(&format!("an array of length {N}"))
+            write!(formatter, "an array of length {N}")
         }
 
         #[inline]
@@ -305,6 +304,22 @@ where
     Ref(&'a mut T),
     /// An owned [`Box`] of a type
     Owned(Box<T>),
+}
+
+impl<'a, T> Clone for OwnedRefMut<'a, T>
+where
+    T: 'a + Sized + Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            Self::RefRaw(ptr, mrkr) => Self::RefRaw(*ptr, mrkr.clone()),
+            Self::Ref(reference) => {
+                let ptr = (&raw const **reference).cast_mut();
+                unsafe { Self::RefRaw(ptr, UnsafeMarker::new()) }
+            }
+            Self::Owned(elt) => Self::Owned(elt.clone()),
+        }
+    }
 }
 
 impl<'a, T> OwnedRefMut<'a, T>

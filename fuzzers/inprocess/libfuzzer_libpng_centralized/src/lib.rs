@@ -15,7 +15,7 @@ use libafl::{
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
@@ -25,7 +25,7 @@ use libafl::{
     },
     observers::{CanTrack, HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::mutational::StdMutationalStage,
+    stages::{IfStage, StdMutationalStage},
     state::{HasCorpus, StdState},
     Error, HasMetadata,
 };
@@ -196,14 +196,18 @@ pub extern "C" fn libafl_main() {
 
             // Setup a basic mutator with a mutational stage
             let mutator = HavocScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-            let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+            let is_main = mgr.is_main();
+            let stages = tuple_list!(IfStage::new(
+                move |_state: &mut _, _mgr: &mut _| Ok(!is_main),
+                tuple_list!(StdMutationalStage::new(mutator)),
+            ));
 
             // A minimization+queue policy to get testcasess from the corpus
             let scheduler =
                 IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
 
             // A fuzzer with feedbacks and a corpus scheduler
-            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+            let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
             // The wrapped harness function, calling out to the LLVM-style harness
             let mut harness = |input: &BytesInput| {
@@ -238,16 +242,9 @@ pub extern "C" fn libafl_main() {
                     .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", opt.input));
                 println!("We imported {} inputs from disk.", state.corpus().count());
             }
-            if !mgr.is_main() {
-                println!("Running client fuzz_loop");
-                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
-                println!("Client fuzz_loop finished");
-            } else {
-                println!("Running main fuzz_loop");
-                let mut empty_stages = tuple_list!();
-                fuzzer.fuzz_loop(&mut empty_stages, &mut executor, &mut state, &mut mgr)?;
-                println!("Main fuzz_loop finished");
-            }
+            println!("Running fuzz_loop (is_main: {})", mgr.is_main());
+            fuzzer.fuzz_loop(&mut executor, &mut state, &mut mgr)?;
+            println!("fuzz_loop finished");
             Ok(())
         };
 

@@ -70,10 +70,9 @@ use crate::{
 
 /// How do we capture stdout/stderr. Not intended for public use.
 #[derive(Debug, Default)]
-#[allow(dead_code)]
 enum StdCommandCaptureMethod {
     #[cfg(unix)]
-    Fd(RawFd),
+    Fd(#[cfg_attr(not(feature = "fork"), expect(dead_code))] RawFd),
     #[default]
     Pipe,
 }

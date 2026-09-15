@@ -43,7 +43,7 @@ use crate::{
     mutators::Tokens,
     observers::MapObserver,
     schedulers::{HasQueueCycles, minimizer::IsFavoredMetadata},
-    stages::{Restartable, Stage, calibrate::UnstableEntriesMetadata},
+    stages::{Restartable, calibrate::UnstableEntriesMetadata, pull::Stage},
     state::{HasCorpus, HasExecutions, HasImported, HasStartTime, Stoppable},
 };
 

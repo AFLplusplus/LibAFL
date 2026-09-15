@@ -8,13 +8,13 @@ use libafl::{
     executors::{forkserver::ForkserverExecutor, HasObservers, StdChildArgs},
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{havoc_mutations, HavocScheduledMutator},
     observers::{CanTrack, HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
-    stages::mutational::StdMutationalStage,
+    stages::StdMutationalStage,
     state::{HasCorpus, StdState},
 };
 use libafl_bolts::{
@@ -126,7 +126,11 @@ pub fn main() {
     let mut mgr = SimpleEventManager::new(monitor);
 
     let scheduler = IndexesLenTimeMinimizerScheduler::new(&edges_observer, QueueScheduler::new());
-    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+
+    let mutator = HavocScheduledMutator::with_max_stack_pow(havoc_mutations(), 6);
+    let stages = tuple_list!(StdMutationalStage::new(mutator));
+
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective, stages);
 
     let observer_ref = edges_observer.handle();
 
@@ -166,10 +170,7 @@ pub fn main() {
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
-    let mutator = HavocScheduledMutator::with_max_stack_pow(havoc_mutations(), 6);
-    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-
     fuzzer
-        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .fuzz_loop(&mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
 }

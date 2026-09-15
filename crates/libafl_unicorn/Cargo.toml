@@ -18,7 +18,7 @@ categories = [
 ]
 
 [dependencies]
-libafl_targets = { path = "../libafl_targets" }
+libafl_targets = { workspace = true, default-features = true }
 
 # External dependencies
 capstone = { workspace = true }

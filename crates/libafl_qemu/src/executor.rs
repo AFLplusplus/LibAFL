@@ -24,7 +24,7 @@ use libafl::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasCurrentTestcase, HasExecutions, HasSolutions},
+    state::{HasCurrentTestcase, HasExecutions, HasInFlightExecutions, HasSolutions},
 };
 #[cfg(feature = "usermode")]
 use libafl_bolts::minibsod;
@@ -74,7 +74,12 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
     E::Observers: ObserversTuple<I, S>,
     EM: EventFirer<I, S> + EventRestarter<S>,
     OF: Feedback<EM, I, E::Observers, S>,
-    S: HasExecutions + HasSolutions<I> + HasCorpus<I> + HasCurrentTestcase<I> + Unpin,
+    S: HasExecutions
+        + HasSolutions<I>
+        + HasCorpus<I>
+        + HasCurrentTestcase<I>
+        + HasInFlightExecutions<I>
+        + Unpin,
     Z: HasObjective<Objective = OF>,
     I: Input + Clone + Unpin,
 {
@@ -175,7 +180,7 @@ pub unsafe fn inproc_qemu_timeout_handler<E, EM, ET, I, OF, S, Z>(
     ET: EmulatorModuleTuple<I, S>,
     I: Unpin,
     OF: Feedback<EM, I, E::Observers, S>,
-    S: HasExecutions + HasSolutions<I> + Unpin + HasCurrentTestcase<I>,
+    S: HasExecutions + HasSolutions<I> + Unpin + HasCurrentTestcase<I> + HasInFlightExecutions<I>,
     I: Input,
     Z: HasObjective<Objective = OF>,
 {
@@ -232,7 +237,7 @@ where
     H: FnMut(&mut Emulator<C, CM, ED, ET, I, S, SM>, &mut S, &I) -> ExitKind,
     I: Input + Unpin,
     OT: ObserversTuple<I, S>,
-    S: Unpin + HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+    S: Unpin + HasExecutions + HasSolutions<I> + HasCurrentTestcase<I> + HasInFlightExecutions<I>,
 {
     pub fn new<OF>(
         emulator: Emulator<C, CM, ED, ET, I, S, SM>,
@@ -284,7 +289,9 @@ where
             first_exec: true,
         })
     }
+}
 
+impl<C, CM, ED, EM, ET, H, I, OT, S, SM, Z> QemuExecutor<C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
     #[must_use]
     pub fn inner(&self) -> &EmulatorInProcessExecutor<C, CM, ED, EM, ET, H, I, OT, S, SM, Z> {
         &self.inner

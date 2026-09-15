@@ -1,6 +1,6 @@
 //! A stage implementation that can have dynamic stage runtime
 
-use super::{Restartable, Stage};
+use super::{Restartable, pull::Stage};
 
 /// A dynamic stage implementation. This explicity uses enum so that rustc can better
 /// reason about the bounds.

@@ -498,6 +498,16 @@ impl<T> Clone for Handle<T> {
 }
 
 #[cfg(feature = "alloc")]
+impl<T: Named + ?Sized> From<&T> for Handle<T> {
+    fn from(named: &T) -> Self {
+        Self {
+            name: named.name().clone(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
 impl<T> Debug for Handle<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Handle")
