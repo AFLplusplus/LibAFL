@@ -238,7 +238,7 @@ winapi = { version = "0.3", features = [
   "winbase",
   "winnt",
 ] }
-windows-result = "0.4.1"
+windows-result = "0.100.0"
 
 [target.'cfg(windows)'.build-dependencies]
 windows = { workspace = true }

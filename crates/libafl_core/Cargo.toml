@@ -61,7 +61,7 @@ nonzero_macros = { workspace = true }
 serde = { workspace = true, features = ["derive", "alloc"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-result = "0.4.1"
+windows-result = "0.100.0"
 
 
 [lints]
