@@ -493,7 +493,14 @@ impl SnapshotModule {
 
                             unsafe { qemu.write_mem_unchecked(*page, &data[..]) };
                         } else {
-                            panic!("Cannot restored a dirty but unsaved page");
+                            // Page was non-readable at snapshot time (e.g. a PROT_NONE guard
+                            // page for a thread stack that glibc created before the snapshot).
+                            // We have no saved content; zero it so subsequent runs see a clean
+                            // state, then reset_maps will re-apply the original permissions.
+                            if !Self::modify_mapping(qemu, new_maps, *page) {
+                                return true; // Restore later
+                            }
+                            unsafe { qemu.write_mem_unchecked(*page, &SNAPSHOT_PAGE_ZEROES) };
                         }
                     }
                     false
@@ -531,7 +538,8 @@ impl SnapshotModule {
                     if let Some(data) = info.data.as_ref() {
                         unsafe { qemu.write_mem_unchecked(*page, &data[..]) };
                     } else {
-                        panic!("Cannot restored a dirty but unsaved page");
+                        // Non-readable at snapshot time; zero it.
+                        unsafe { qemu.write_mem_unchecked(*page, &SNAPSHOT_PAGE_ZEROES) };
                     }
                 }
             }
