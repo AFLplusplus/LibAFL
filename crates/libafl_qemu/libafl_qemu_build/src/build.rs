@@ -117,7 +117,11 @@ fn configure_qemu(
         .arg("--audio-drv-list=")
         .arg("--disable-af-xdp")
         .arg("--disable-alsa")
-        .arg("--disable-attr")
+        .arg(if cfg!(feature = "virtfs") {
+            "--enable-attr"
+        } else {
+            "--disable-attr"
+        })
         .arg("--disable-auth-pam")
         .arg("--disable-dbus-display")
         .arg("--disable-bochs")
@@ -207,7 +211,11 @@ fn configure_qemu(
         .arg("--disable-vhost-user-blk-server")
         .arg("--disable-vhost-vdpa")
         .arg("--disable-virglrenderer")
-        .arg("--disable-virtfs")
+        .arg(if cfg!(feature = "virtfs") {
+            "--enable-virtfs"
+        } else {
+            "--disable-virtfs"
+        })
         .arg("--disable-vmnet")
         .arg("--disable-vnc")
         .arg("--disable-vnc-jpeg")
