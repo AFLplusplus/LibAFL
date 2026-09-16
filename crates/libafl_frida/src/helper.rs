@@ -692,6 +692,15 @@ where
                     }
                 }
 
+
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+                let res = if let Some(_rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
+                    AsanRuntime::asan_is_interesting_instruction(decoder, address, instr)
+                } else {
+                    vec![]
+                };
+
+                #[cfg(target_arch = "aarch64")]
                 let res = if let Some(_rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                     AsanRuntime::asan_is_interesting_instruction(decoder, address, instr)
                 } else {
@@ -699,26 +708,26 @@ where
                 };
 
                 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-                if let Some(details) = res
-                    && let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>()
-                {
-                    let start = output.writer().pc();
-                    rt.emit_shadow_check(
-                        address,
-                        output,
-                        instr.bytes().len(),
-                        details.0,
-                        details.1,
-                        details.2,
-                        details.3,
-                        details.4,
-                    );
-                    log::trace!(
-                        "emitted shadow_check for {:x} at {:x}-{:x}",
-                        address,
-                        start,
-                        output.writer().pc()
-                    );
+                if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
+                    for details in res {
+                        let start = output.writer().pc();
+                        rt.emit_shadow_check(
+                            address,
+                            output,
+                            instr.bytes().len(),
+                            details.0,
+                            details.1,
+                            details.2,
+                            details.3,
+                            details.4,
+                        );
+                        log::trace!(
+                            "emitted shadow_check for {:x} at {:x}-{:x}",
+                            address,
+                            start,
+                            output.writer().pc()
+                        );
+                    }
                 }
 
                 #[cfg(target_arch = "aarch64")]
