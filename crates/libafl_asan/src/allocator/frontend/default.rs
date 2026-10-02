@@ -82,8 +82,9 @@ impl<B: GlobalAlloc + Send, S: Shadow, T: Tracking> AllocatorFrontend for Defaul
         let data = if align == 0 {
             rz
         } else {
-            rz + align - (rz % align)
+            rz + ((align - (rz % align)) % align)
         };
+        assert!(data.is_multiple_of(Self::ALLOC_ALIGN_SIZE));
         assert!(align == 0 || data.is_multiple_of(align));
         assert!(data + len <= orig + allocated_size);
 
