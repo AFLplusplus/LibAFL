@@ -23,6 +23,10 @@ use core::{
 };
 #[cfg(target_vendor = "apple")]
 use std::fs;
+#[cfg(target_os = "android")]
+use std::os::android::net::SocketAddrExt;
+#[cfg(target_os = "linux")]
+use std::os::linux::net::SocketAddrExt;
 use std::{
     env,
     io::{Read, Write},
@@ -32,9 +36,10 @@ use std::{
 };
 #[cfg(all(feature = "std", unix))]
 use std::{
+    io,
     os::unix::{
-        io::{AsRawFd, RawFd},
-        net::{UnixListener, UnixStream},
+        io::{AsRawFd, IntoRawFd, RawFd},
+        net::{SocketAddr, UnixListener, UnixStream},
     },
     thread,
 };
@@ -46,7 +51,7 @@ use nix::poll::PollTimeout;
 use nix::poll::{PollFd, PollFlags, poll};
 use serde::{Deserialize, Serialize};
 #[cfg(all(unix, feature = "std"))]
-use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
+use unix_ancillary::UnixStreamExt;
 
 use crate::{Error, ShMem, ShMemDescription, ShMemId, ShMemProvider};
 
@@ -56,6 +61,21 @@ const UNIX_SERVER_NAME: &str = "@libafl_unix_shmem_server";
 /// `MacOS` server name is on disk, since `MacOS` doesn't support abtract domain sockets.
 #[cfg(target_vendor = "apple")]
 const UNIX_SERVER_NAME: &str = "./libafl_unix_shmem_server";
+
+/// Parse a socket name: a leading `@` selects the abstract namespace
+/// (Linux and Android only), anything else is a filesystem path.
+fn service_addr(name: &str) -> io::Result<SocketAddr> {
+    match name.strip_prefix('@') {
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        Some(abstract_name) => SocketAddr::from_abstract_name(abstract_name),
+        #[cfg(not(any(target_os = "linux", target_os = "android")))]
+        Some(_) => Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "abstract unix socket addresses are not supported on this platform",
+        )),
+        None => SocketAddr::from_pathname(name),
+    }
+}
 
 /// Env variable. If set, we won't try to spawn the service
 const AFL_SHMEM_SERVICE_STARTED: &str = "AFL_SHMEM_SERVICE_STARTED";
@@ -129,8 +149,10 @@ impl<SP> ServedShMemProvider<SP> {
         //.expect("Failed to send message");
 
         let mut shm_slice = [0_u8; 20];
-        let mut fd_buf = [-1; 1];
-        let (slice_size, fd_count) = self.stream.recv_fds(&mut shm_slice, &mut fd_buf)?;
+        let (slice_size, fds) = self.stream.recv_fds_into::<1>(&mut shm_slice)?;
+        let fd_count = fds.len();
+        // The inner provider takes ownership of the received fd through its id.
+        let client_fd = fds.into_iter().next().map_or(-1, IntoRawFd::into_raw_fd);
         //.expect("Did not receive a response");
         if slice_size == 0 && fd_count == 0 {
             return Err(Error::illegal_state(format!(
@@ -140,7 +162,7 @@ impl<SP> ServedShMemProvider<SP> {
 
         let server_id = ShMemId::from_array(&shm_slice);
         let server_fd: i32 = server_id.into();
-        Ok((server_fd, fd_buf[0]))
+        Ok((server_fd, client_fd))
     }
 
     /// Tell the provider that we are about to restart and the worker should not kill the shared memory
@@ -182,7 +204,7 @@ where
         let service = ShMemService::<SP>::start();
 
         let mut res = Self {
-            stream: UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?).map_err(|err| Error::illegal_state(if cfg!(target_vendor = "apple") {
+            stream: UnixStream::connect_addr(&service_addr(UNIX_SERVER_NAME)?).map_err(|err| Error::illegal_state(if cfg!(target_vendor = "apple") {
                 format!("The ServedShMemProvider was not started or is no longer running. You may need to remove the './libafl_unix_shmem_server' file and retry. Error details: {err:?}")
             } else {
                 format!("The ServedShMemProvider was not started or is no longer running. Error details: {err:?}")
@@ -238,11 +260,10 @@ where
                 bg_thread.lock().unwrap().join_handle = None;
             }
             //fn connect(&mut self) -> Result<Self, Error> {
-            //self.stream = UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?)?,
+            //self.stream = UnixStream::connect_addr(&service_addr(UNIX_SERVER_NAME)?)?,
 
             // After fork, the child needs to reconnect as to not share the fds with the parent.
-            self.stream =
-                UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?)?;
+            self.stream = UnixStream::connect_addr(&service_addr(UNIX_SERVER_NAME)?)?;
             let (id, _) = self.send_receive(ServedShMemRequest::PostForkChildHello(self.id))?;
             self.id = id;
         }
@@ -348,8 +369,7 @@ impl Drop for ShMemServiceThread {
     fn drop(&mut self) {
         if self.join_handle.is_some() {
             log::info!("Stopping ShMemService");
-            let Ok(mut stream) =
-                UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap())
+            let Ok(mut stream) = UnixStream::connect_addr(&service_addr(UNIX_SERVER_NAME).unwrap())
             else {
                 return;
             };
@@ -630,20 +650,25 @@ where
                 let id = mapping.as_ref().borrow().id();
                 let server_fd: i32 = id.to_string().parse().unwrap();
                 let client = self.clients.get_mut(&client_id).unwrap();
+                // # Safety
+                // The id of a served map is its open fd, kept alive by `mapping` until after the send.
+                let server_fd_borrowed = unsafe { BorrowedFd::borrow_raw(server_fd) };
                 client
                     .stream
-                    .send_fds(id.to_string().as_bytes(), &[server_fd])?;
+                    .send_fds(id.to_string().as_bytes(), &[server_fd_borrowed])?;
                 client.maps.entry(server_fd).or_default().push(mapping);
             }
             ServedShMemResponse::Id(id) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
-                client.stream.send_fds(id.to_string().as_bytes(), &[])?;
+                client
+                    .stream
+                    .send_fds(id.to_string().as_bytes(), &[] as &[BorrowedFd<'_>])?;
             }
             ServedShMemResponse::RefCount(refcount) => {
                 let client = self.clients.get_mut(&client_id).unwrap();
                 client
                     .stream
-                    .send_fds(refcount.to_string().as_bytes(), &[])?;
+                    .send_fds(refcount.to_string().as_bytes(), &[] as &[BorrowedFd<'_>])?;
             }
         }
         Ok(())
@@ -656,7 +681,7 @@ where
         filename: &str,
         syncpair: &Arc<(Mutex<ShMemServiceStatus>, Condvar)>,
     ) -> Result<(), Error> {
-        let listener = match UnixListener::bind_unix_addr(&UnixSocketAddr::new(filename)?) {
+        let listener = match UnixListener::bind_addr(&service_addr(filename)?) {
             Ok(listener) => listener,
             Err(err) => {
                 let (lock, cvar) = &**syncpair;
@@ -703,7 +728,7 @@ where
                             }
                         }
                     } else {
-                        let (stream, _addr) = match listener.accept_unix_addr() {
+                        let (stream, _addr) = match listener.accept() {
                             Ok(stream_val) => stream_val,
                             Err(e) => {
                                 log::error!("Error accepting client: {e:?}");
@@ -743,6 +768,41 @@ where
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod service_addr_tests {
+    use super::service_addr;
+
+    #[test]
+    fn path_name_is_a_pathname_address() {
+        let addr = service_addr("./libafl_unix_shmem_server").unwrap();
+        assert_eq!(
+            addr.as_pathname(),
+            Some(std::path::Path::new("./libafl_unix_shmem_server"))
+        );
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[test]
+    fn at_prefix_is_an_abstract_address() {
+        #[cfg(target_os = "android")]
+        use std::os::android::net::SocketAddrExt;
+        #[cfg(target_os = "linux")]
+        use std::os::linux::net::SocketAddrExt;
+
+        let addr = service_addr("@libafl_unix_shmem_server").unwrap();
+        assert_eq!(
+            addr.as_abstract_name(),
+            Some(&b"libafl_unix_shmem_server"[..])
+        );
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    #[test]
+    fn at_prefix_is_rejected_without_abstract_namespace() {
+        assert!(service_addr("@libafl_unix_shmem_server").is_err());
     }
 }
 
