@@ -44,7 +44,9 @@ use mach_sys::{
         target_os = "android"
     )
 ))]
-use mmap_rs::{MmapFlags, MmapMut, MmapOptions, ReservedMut};
+use mmap_rs::{MmapMut, MmapOptions, ReservedMut};
+#[cfg(not(windows))]
+use mmap_rs::MmapFlags;
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
 
@@ -161,7 +163,7 @@ impl Allocator {
     #[inline]
     #[must_use]
     fn round_up_to_page(&self, size: usize) -> usize {
-        ((size + self.page_size) / self.page_size) * self.page_size
+        (size + self.page_size - 1) / self.page_size * self.page_size
     }
 
     #[inline]
@@ -219,22 +221,32 @@ impl Allocator {
             //     "Mapping {:x}, size {rounded_up_size:x}",
             //     self.current_mapping_addr
             // );
-            let mapping = match MmapOptions::new(rounded_up_size)
+            #[cfg(windows)]
+            let mapping_result =
+                MmapOptions::new(rounded_up_size).unwrap().map_mut();
+            #[cfg(not(windows))]
+            let mapping_result = MmapOptions::new(rounded_up_size)
                 .unwrap()
                 .with_address(self.current_mapping_addr)
-                .map_mut()
-            {
+                .map_mut();
+
+            let mapping = match mapping_result {
                 Ok(mapping) => mapping,
                 Err(err) => {
                     log::error!("An error occurred while mapping memory: {err:?}");
                     return core::ptr::null_mut();
                 }
             };
-            self.current_mapping_addr += ((rounded_up_size
-                + MmapOptions::allocation_granularity())
-                / MmapOptions::allocation_granularity())
-                * MmapOptions::allocation_granularity();
 
+            #[cfg(not(windows))]
+            {
+                self.current_mapping_addr += ((rounded_up_size
+                    + MmapOptions::allocation_granularity())
+                    / MmapOptions::allocation_granularity())
+                    * MmapOptions::allocation_granularity();
+            }
+
+            #[cfg(not(windows))]
             self.map_shadow_for_region(
                 mapping.as_ptr() as usize,
                 unsafe { mapping.as_ptr().add(rounded_up_size) as usize },
@@ -257,14 +269,28 @@ impl Allocator {
         };
 
         self.largest_allocation = core::cmp::max(self.largest_allocation, metadata.actual_size);
-        // unpoison the shadow memory for the allocation itself
+        // Electric-fence layout: place the requested bytes so they END on a page
+        // boundary, with a guard page immediately after. On Windows that guard is
+        // PAGE_NOACCESS, so the first byte of an overrun faults (caught by the
+        // fuzzer's crash handler). No byte-granular shadow is needed.
+        let data_len = self.round_up_to_page(size);
+        let usable = metadata.address + data_len - size;
+        let guard_start = usable + size; // == metadata.address + data_len, page-aligned
+
+        // unpoison the shadow memory for the allocation itself (non-Windows backstop)
+        #[cfg(not(windows))]
         unsafe {
-            Self::unpoison(
-                map_to_shadow!(self, metadata.address + self.page_size),
-                size,
-            );
+            Self::unpoison(map_to_shadow!(self, usable), size);
         }
-        let address = (metadata.address + self.page_size) as *mut c_void;
+
+        #[cfg(windows)]
+        unsafe {
+            // The region may be a reused block that release() made PAGE_NOACCESS.
+            Self::protect(metadata.address, data_len, false);
+            Self::protect(guard_start, self.page_size, true);
+        }
+
+        let address = usable as *mut c_void;
 
         self.allocations.insert(address as usize, metadata);
         // log::info!("serving address: {address:?}, size: {size:x}");
@@ -278,7 +304,7 @@ impl Allocator {
         let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) else {
             if !ptr.is_null()
                 && AsanErrors::get_mut_blocking()
-                    .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())))
+                    .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new_unresolved())))
             {
                 panic!("ASAN: Crashing target!");
             }
@@ -289,11 +315,12 @@ impl Allocator {
             && AsanErrors::get_mut_blocking().report_error(AsanError::DoubleFree((
                 ptr as usize,
                 metadata.clone(),
-                Backtrace::new(),
+                Backtrace::new_unresolved(),
             )))
         {
             panic!("ASAN: Crashing target!");
         }
+        #[cfg(not(windows))]
         let shadow_mapping_start = map_to_shadow!(self, ptr as usize);
 
         metadata.freed = true;
@@ -302,8 +329,19 @@ impl Allocator {
         }
 
         // poison the shadow memory for the allocation
+        #[cfg(not(windows))]
         unsafe {
             Self::poison(shadow_mapping_start, metadata.size);
+        }
+
+        // On Windows, make the freed block PAGE_NOACCESS so a later
+        // use-after-free faults. `actual_size` is `round_up(size) + 2 pages`,
+        // so `actual_size - 2 * page_size` is the (page-aligned) data region.
+        #[cfg(windows)]
+        unsafe {
+            let data_len = metadata.actual_size - 2 * self.page_size;
+            let block = metadata.address;
+            Self::protect(block, data_len, true);
         }
     }
 
@@ -333,6 +371,51 @@ impl Allocator {
         closest
     }
 
+    /// Check whether a memory access of `size` bytes starting at `address` is
+    /// valid, using allocation metadata instead of shadow memory.
+    ///
+    /// `allocations` is keyed by the *usable* start address of each allocation,
+    /// in ascending order. We find the allocation whose start is the greatest
+    /// one that is still `<= address`, then:
+    /// - no such allocation means the address is unmanaged (outside every tracked
+    ///   allocation), so we assume it is valid and return `true`;
+    /// - a freed allocation is a use-after-free (`false`);
+    /// - an access extending past `start + metadata.size` is out-of-bounds (`false`);
+    /// - otherwise it is valid (`true`).
+    ///
+    /// This is the source-free, metadata-only equivalent of a shadow-memory
+    /// check and doesn't require a fixed, huge shadow mapping, so it also works
+    /// on platforms (e.g. Windows) where committing a 16 TiB shadow hangs.
+    #[inline]
+    #[must_use]
+    pub fn check_access(&mut self, address: usize, size: usize) -> bool {
+        if size == 0 {
+            return true;
+        }
+
+        // The allocation whose start is the greatest that is <= `address` (and
+        // thus the only candidate that could contain it).
+        let Some((&start, metadata)) = self.allocations.range(..=address).next_back() else {
+            return true;
+        };
+
+        let Some(end) = address.checked_add(size) else {
+            return false;
+        };
+
+        // `start + metadata.size` cannot overflow in practice (allocations are
+        // user-space sized), but saturate to be safe.
+        let alloc_end = start.saturating_add(metadata.size);
+
+        if address >= start && end <= alloc_end {
+            // Within the allocation's requested bounds: still valid unless freed.
+            return !metadata.freed;
+        }
+
+        // Out of bounds write/read.
+        false
+    }
+
     /// Resets the allocator contents
     pub fn reset(&mut self) {
         let mut tmp_allocations = Vec::new();
@@ -342,6 +425,7 @@ impl Allocator {
                 continue;
             }
             // First poison the memory.
+            #[cfg(not(windows))]
             unsafe {
                 Self::poison(map_to_shadow!(self, address), allocation.size);
             }
@@ -360,8 +444,9 @@ impl Allocator {
         }
 
         for allocation in tmp_allocations {
-            self.allocations
-                .insert(allocation.address + self.page_size, allocation);
+            let usable = allocation.address + self.round_up_to_page(allocation.size)
+                - allocation.size;
+            self.allocations.insert(usable, allocation);
         }
 
         self.total_allocation_size = 0;
@@ -413,6 +498,36 @@ impl Allocator {
                 ((start + size / 8) as *mut u8).write(current_value);
             }
         }
+    }
+
+    /// Set the protection of a page-aligned range, for guard pages.
+    ///
+    /// On Windows, guard pages (`PAGE_NOACCESS`) make an overrun or a
+    /// use-after-free fault via the hardware, which the fuzzer's crash handler
+    /// turns into an objective — no shadow memory required. Reused pages are
+    /// flipped back to `PAGE_READWRITE`. On other platforms the shadow does the
+    /// same job, so this is a no-op.
+    ///
+    /// # Safety
+    /// `address` must be page-aligned and `[address, address + size)` mapped.
+    pub unsafe fn protect(address: usize, size: usize, noaccess: bool) {
+        #[cfg(windows)]
+        unsafe {
+            use winapi::ctypes::c_void;
+            use winapi::um::memoryapi::VirtualProtect;
+            use winapi::um::winnt::{PAGE_NOACCESS, PAGE_READWRITE};
+
+            let mut old = 0u32;
+            let _ = VirtualProtect(
+                address as *mut c_void,
+                size,
+                if noaccess { PAGE_NOACCESS } else { PAGE_READWRITE },
+                &mut old,
+            );
+        }
+
+        #[cfg(not(windows))]
+        let _ = (address, size, noaccess);
     }
 
     /// Map shadow memory for a region, and optionally unpoison it
@@ -469,6 +584,29 @@ impl Allocator {
                 self.mappings
                     .insert(newly_committed_region.start(), newly_committed_region);
             }
+        } else {
+            // Without a pre-allocated shadow mapping (Windows: a huge fixed-address
+            // reservation cannot be committed in pieces), commit the shadow pages
+            // directly, on demand, as each region is first mapped.
+            let mut newly_committed_regions = Vec::new();
+            for gap in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
+                match MmapOptions::new(gap.end - gap.start)
+                    .unwrap()
+                    .with_address(gap.start)
+                    .map_mut()
+                {
+                    Ok(mapping) => newly_committed_regions.push(mapping),
+                    Err(err) => {
+                        log::error!("Failed to commit shadow memory: {err:?}");
+                    }
+                }
+            }
+            for newly_committed_region in newly_committed_regions {
+                self.shadow_pages
+                    .insert(newly_committed_region.start()..newly_committed_region.end());
+                self.mappings
+                    .insert(newly_committed_region.start(), newly_committed_region);
+            }
         }
 
         if unpoison {
@@ -518,6 +656,12 @@ impl Allocator {
     #[inline]
     #[must_use]
     pub fn check_shadow(&mut self, address: *const c_void, size: usize) -> bool {
+        // On Windows the fixed 16 TiB shadow cannot be committed, so use the
+        // metadata-based check (allocations BTreeMap bounds + freed) instead of
+        // the shadow bytes. On other platforms keep the shadow implementation.
+        #[cfg(windows)]
+        return self.check_access(address as usize, size);
+
         //the algorithm for check_shadow is as follows:
         //1. we first check if its managed. if is not then exit
         //2. we check if it is aligned. this should be 99% of accesses. If it is do an aligned check and leave
@@ -603,11 +747,19 @@ impl Allocator {
         }
         valid
     }
-    /// Checks if the currennt address is one of ours
+    /// Checks if the current address is one of ours
     #[inline]
     pub fn is_managed(&self, ptr: *mut c_void) -> bool {
-        //self.allocations.contains_key(&(ptr as usize))
-        self.base_mapping_addr <= ptr as usize && (ptr as usize) < self.current_mapping_addr
+        #[cfg(windows)]
+        {
+            // On Windows there is no contiguous `base_mapping_addr..current_mapping_addr` range
+            // (mappings are individually VirtualAlloc'd), so consult the allocations map instead.
+            self.allocations.contains_key(&(ptr as usize))
+        }
+        #[cfg(not(windows))]
+        {
+            self.base_mapping_addr <= ptr as usize && (ptr as usize) < self.current_mapping_addr
+        }
     }
 
     /// Checks if any of the allocations has not been freed
@@ -800,28 +952,42 @@ impl Allocator {
                 }
 
                 if good_candidate {
-                    // We reserve the shadow memory space of size addr*2, but don't commit it.
-                    if let Ok(mapping) = MmapOptions::new(1 << (try_shadow_bit + 1))
-                        .unwrap()
-                        .with_flags(MmapFlags::NO_RESERVE)
-                        .with_address(addr)
-                        .reserve_mut()
-                    {
-                        shadow_bit = (try_shadow_bit).try_into().unwrap();
+                    shadow_bit = (try_shadow_bit).try_into().unwrap();
+                    log::warn!("shadow_bit {shadow_bit:} is suitable");
 
-                        log::warn!("shadow_bit {shadow_bit:} is suitable");
-                        log::trace!(
-                            "shadow area from {:x} to {:x} pre-allocated",
-                            addr,
-                            addr + (1 << (try_shadow_bit + 1))
-                        );
-                        self.pre_allocated_shadow_mappings.push(mapping);
-                        self.using_pre_allocated_shadow_mapping = true;
-                        break;
+                    // On Windows, pre-reserving the shadow as one huge fixed-address
+                    // `VirtualAlloc(MEM_RESERVE)` prevents its pieces from ever being
+                    // committed, so instead we commit shadow pages on demand in
+                    // `map_shadow_for_region`.
+                    #[cfg(not(windows))]
+                    {
+                        // We reserve the shadow memory space of size addr*2, but don't commit it.
+                        let mapping = MmapOptions::new(1 << (try_shadow_bit + 1))
+                            .unwrap()
+                            .with_flags(MmapFlags::NO_RESERVE)
+                            .with_address(addr)
+                            .reserve_mut();
+                        match mapping {
+                            Ok(mapping) => {
+                                log::trace!(
+                                    "shadow area from {:x} to {:x} pre-allocated",
+                                    addr,
+                                    addr + (1 << (try_shadow_bit + 1))
+                                );
+                                self.pre_allocated_shadow_mappings.push(mapping);
+                                self.using_pre_allocated_shadow_mapping = true;
+                            }
+                            Err(err) => {
+                                log::warn!(
+                                    "shadow_bit {try_shadow_bit:} is not suitable - failed to \
+                                     allocate shadow memory: {err:?}"
+                                );
+                                continue;
+                            }
+                        }
                     }
-                    log::warn!(
-                        "shadow_bit {try_shadow_bit:} is not suitable - failed to allocate shadow memory"
-                    );
+
+                    break;
                 }
             }
         }
@@ -958,4 +1124,30 @@ fn check_shadow() {
     assert!(allocator.check_shadow(unsafe { allocation.add(4) }, 8));
     let allocation = unsafe { allocator.alloc(0x3c, 0) };
     assert!(allocator.check_shadow(unsafe { allocation.add(0x3a) }, 2));
+}
+
+#[test]
+fn check_access_metadata() {
+    use frida_gum::Gum;
+    let _gum = Gum::obtain();
+    let mut allocator = Allocator::default();
+    allocator.init();
+
+    let a = unsafe { allocator.alloc(8, 8) };
+    assert!(!a.is_null());
+    let base = a as usize;
+
+    // Within the requested bounds: valid.
+    assert!(allocator.check_access(base, 1));
+    assert!(allocator.check_access(base, 8));
+    // Out-of-bounds: invalid.
+    assert!(!allocator.check_access(base, 9));
+    assert!(!allocator.check_access(base + 9, 1));
+    assert!(!allocator.check_access(base + 7, 2)); // straddles the end
+    // Address before every allocation: unmanaged -> valid.
+    assert!(allocator.check_access(1, 1));
+
+    // Use-after-free: freed allocation is no longer valid.
+    unsafe { allocator.release(a) };
+    assert!(!allocator.check_access(base, 1));
 }

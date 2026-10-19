@@ -162,7 +162,7 @@ impl AsanErrors {
         let backtrace_printer = BacktracePrinter::new()
             .clear_frame_filters()
             .print_addresses(true)
-            .verbosity(Verbosity::Full)
+            .verbosity(Verbosity::Minimal)
             .add_frame_filter(Box::new(|frames| {
                 frames.retain(
                     |x| matches!(&x.name, Some(n) if !n.starts_with("libafl_frida::asan_rt::")),

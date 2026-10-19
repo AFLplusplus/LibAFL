@@ -234,9 +234,21 @@ impl AsanRuntime {
         size: usize,
     ) -> *mut c_void {
         log::trace!("hook_RtlAllocateHeap handle {_handle:#?} flags {flags:x} size {size}");
-
         let mut allocator = self.allocator_mut();
         let ret = unsafe { allocator.alloc(size, 8) };
+        {
+            static M: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+            let m = M.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+            if m < 400 {
+                log::warn!("FIRED size={size} m={m} ret={:#x}", ret as usize);
+            }
+        }
+        if size <= 64 {
+            static N: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+            if N.fetch_add(1, core::sync::atomic::Ordering::SeqCst) < 80 {
+                log::warn!("HOOKSMALL size={size} flags={flags:#x} ret={:#x}", ret as usize);
+            }
+        }
 
         if flags & 8 == 8 {
             unsafe {

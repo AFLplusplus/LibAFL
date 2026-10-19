@@ -482,6 +482,15 @@ impl FridaInstrumentationHelperBuilder {
                 .init_all(gum, &ranges.borrow(), &module_map);
         }
 
+        #[cfg(all(target_arch = "x86_64", windows))]
+        {
+            let r = ranges.borrow();
+            log::warn!("RANGES count={}", r.iter().count());
+            for (k, _v) in r.iter() {
+                log::warn!("RANGE {:x}-{:x}", k.start, k.end);
+            }
+        }
+
         let transformer = FridaInstrumentationHelper::build_transformer(gum, &ranges, &runtimes);
 
         #[cfg(unix)]
@@ -666,10 +675,34 @@ where
             let instr = instruction.instr();
             let instr_size = instr.bytes().len();
             let address = instr.address();
-            // log::trace!("x - block @ {:x} transformed to {:x}", address, output.writer().pc());
-            //the ASAN check needs to be done before the hook_rt check due to x86 insns such as call [mem]
-            if ranges.borrow().contains_key(&address) {
+            let in_ranges = ranges.borrow().contains_key(&address);
+            if in_ranges {
                 let mut runtimes = (*runtimes_unborrowed).borrow_mut();
+                #[cfg(all(target_arch = "x86_64", windows))]
+                {
+                    // The target imports `kernel32!HeapAlloc`, which is a forwarder to
+                    // `ntdll!RtlAllocateHeap`. Frida's Stalker re-resolves such an indirect
+                    // `call [rip+disp]` back to the original forwarder target, so the IAT rewrite
+                    // (and the raw entry patch) never fire. Rewrite the call to our replacement
+                    // here, in the transformer, where we fully control the emitted code.
+                    let iat = crate::asan::asan_rt::heap_alloc_iat_slot();
+                    if let Some(target) = crate::utils::indirect_call_rip_target(address, instr.bytes()) {
+                        if iat != 0 && target == iat {
+                            let replacement = crate::asan::asan_rt::raw_replacement_addr();
+                            output.writer().put_call_address(replacement as u64);
+                            continue;
+                        }
+                        // Same rewrite for the free path: `call [__imp_HeapFree]` → our free
+                        // replacement so `dealloc` reaches `release` (UAF / double-free). `RtlFreeHeap`
+                        // is a CFG stub, so this transformer rewrite is the only reliable hook.
+                        let free_iat = crate::asan::asan_rt::heap_free_iat_slot();
+                        if free_iat != 0 && target == free_iat {
+                            let free_replacement = crate::asan::asan_rt::raw_replacement_free_addr();
+                            output.writer().put_call_address(free_replacement as u64);
+                            continue;
+                        }
+                    }
+                }
                 if first {
                     first = false;
                     log::trace!(
@@ -698,7 +731,11 @@ where
                     None
                 };
 
-                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+                // Windows uses the electric-fence guard page (PAGE_NOACCESS) for OOB/UAF
+                // detection, not the byte-granular shadow check. Emitting the shadow check
+                // on Windows re-invokes `handle_trap`/`handle_check_access`, which deadlock
+                // on the allocator lock and hang in symbol resolution. Skip it on Windows.
+                #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), not(windows)))]
                 if let Some(details) = res
                     && let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>()
                 {
@@ -749,6 +786,15 @@ where
                     rt.emit_comparison_handling(address, output, &op1, &op2, &shift, &special_case);
                 }
 
+                // NOTE: `add_stalked_address` inserts into a `HashMap<usize, usize>`
+                // (`stalked_addresses`). On Windows every allocation is redirected to the
+                // electric-fence allocator, so the map's rehash (re)allocates through the
+                // intercepted heap and aborts the transform mid-block — leaving only the
+                // prologue instrumented. The stalked->real mapping is only consumed by the
+                // aarch64 trap handler and the heap-hook error backtraces; the Windows
+                // guard-page detector resolves the faulting PC from the VEH and the
+                // `allocations` metadata, so skip it here on Windows.
+                #[cfg(not(windows))]
                 if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
                     rt.add_stalked_address(
                         output.writer().pc() as usize - instr_size,

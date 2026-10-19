@@ -13,7 +13,8 @@ use core::{
     fmt::{self, Debug, Formatter},
     ptr::write_volatile,
 };
-use std::sync::{Mutex, MutexGuard};
+use std::sync::atomic::AtomicBool;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use backtrace::Backtrace;
 use dynasmrt::{DynasmApi, DynasmLabelApi, dynasm};
@@ -22,13 +23,15 @@ use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
-    Gum, Module, ModuleMap, NativePointer, PageProtection, Process, RangeDetails,
+    Gum, Memory, Module, ModuleMap, NativePointer, PageProtection, Process, RangeDetails,
     instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput,
 };
 use frida_gum_sys::Insn;
 use hashbrown::HashMap;
 use libafl_bolts::{cli::FuzzerOptions, get_thread_id, has_tls};
 use libc::wchar_t;
+#[cfg(all(target_arch = "x86_64", windows))]
+use winapi::um::processthreadsapi::{FlushInstructionCache, GetCurrentProcess};
 use rangemap::RangeMap;
 #[cfg(target_arch = "aarch64")]
 use yaxpeax_arch::Arch;
@@ -38,6 +41,8 @@ use yaxpeax_arm::armv8::a64::{ARMv8, InstDecoder, Opcode, Operand, ShiftStyle, S
 use yaxpeax_x86::amd64::{DisplayStyle, InstDecoder, Instruction, Opcode};
 #[cfg(target_arch = "x86")]
 use yaxpeax_x86::protected_mode::{DisplayStyle, InstDecoder, Instruction, Opcode};
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use yaxpeax_arch::LengthedInstruction;
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::utils::frida_to_cs;
@@ -65,10 +70,10 @@ unsafe extern "C" {
 // We don't want to hook any operation initiated by the code of our hook
 // Otherwise, we get into infinite recursion or deadlock
 thread_local! {
-    static ASAN_IN_HOOK: Cell<bool> = const { Cell::new(false) };
+    static ASAN_IN_HOOK: Cell<isize> = const { Cell::new(0) };
 }
 
-/// RAII guard to set and reset the `ASAN_IN_HOOK` properly
+/// RAII guard to increment and decrement the `ASAN_IN_HOOK` re-entrancy depth properly
 #[derive(Debug)]
 pub struct AsanInHookGuard;
 
@@ -76,13 +81,13 @@ impl AsanInHookGuard {
     /// Constructor to save the current last error
     #[must_use]
     pub fn new() -> Self {
-        ASAN_IN_HOOK.set(true);
+        ASAN_IN_HOOK.set(ASAN_IN_HOOK.get() + 1);
         AsanInHookGuard
     }
 }
 impl Drop for AsanInHookGuard {
     fn drop(&mut self) {
-        ASAN_IN_HOOK.set(false);
+        ASAN_IN_HOOK.set(ASAN_IN_HOOK.get() - 1);
     }
 }
 impl Default for AsanInHookGuard {
@@ -282,6 +287,131 @@ const ASAN_EH_FRAME_FDE_OFFSET: u32 = 20;
 #[cfg(target_arch = "aarch64")]
 const ASAN_EH_FRAME_FDE_ADDRESS_OFFSET: u32 = 28;
 
+/// Global flag controlling whether the ASan function hooks are active.
+///
+/// The hook replacements are called re-entrantly from arbitrary target threads via a raw
+/// pointer, so they read this atomic directly. It also lets us disable the hooks from the
+/// crash handler without borrowing the `runtimes` `RefCell` (which the interrupted executor
+/// still holds).
+pub(crate) static ASAN_HOOKS_ENABLED: AtomicBool = AtomicBool::new(false);
+
+/// State for the raw `RtlAllocateHeap` detour installed by
+/// `AsanRuntime::install_rtl_allocate_heap_detour`.
+///
+/// The Windows heap API `HeapAlloc`/`HeapReAlloc`/`HeapSize` are *forwarders* to
+/// `ntdll!RtlAllocateHeap`/`RtlReAllocateHeap`/`RtlSizeHeap`; Frida's
+/// `Interceptor::replace` patches the function entry but does not intercept calls that
+/// arrive through the forwarder, so the target's `Vec`/`Box` allocations bypass the hook
+/// entirely. We therefore patch `RtlAllocateHeap`'s entry with our own absolute jump.
+#[cfg(all(target_arch = "x86_64", windows))]
+struct RtlAllocateHeapDetour {
+    runtime: usize,
+    original: extern "C" fn(*mut c_void, u32, usize) -> *mut c_void,
+    iat_slot: usize,
+}
+
+#[cfg(all(target_arch = "x86_64", windows))]
+static RTL_ALLOCATE_HEAP_DETOUR: OnceLock<RtlAllocateHeapDetour> = OnceLock::new();
+
+/// State for the raw `RtlFreeHeap` detour (mirrors [`RtlAllocateHeapDetour`]).
+#[cfg(all(target_arch = "x86_64", windows))]
+struct RtlFreeHeapDetour {
+    runtime: usize,
+    original: extern "C" fn(*mut c_void, u32, *mut c_void) -> usize,
+}
+
+#[cfg(all(target_arch = "x86_64", windows))]
+static RTL_FREE_HEAP_DETOUR: OnceLock<RtlFreeHeapDetour> = OnceLock::new();
+
+#[cfg(all(target_arch = "x86_64", windows))]
+static HEAP_ALLOC_IAT_SLOT: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+
+/// Address of the target's `HeapFree` IAT slot that `redirect_imports` recorded (0 if not set).
+/// Unlike the alloc slot it is intentionally left pointing at the real forwarder so the
+/// `process_heap_free` fall-through (disabled path) keeps working; it only locates the chokepoint.
+#[cfg(all(target_arch = "x86_64", windows))]
+static HEAP_FREE_IAT_SLOT: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+
+/// Entry address of the target's `process_heap_alloc` that
+/// [`AsanRuntime::install_process_heap_alloc_detour`] raw-jumped (0 if not set).
+#[cfg(all(target_arch = "x86_64", windows))]
+static PROCESS_HEAP_ALLOC_ENTRY: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+
+/// Address of the target's `HeapAlloc` IAT slot that `redirect_imports` rewrote (0 if not set).
+#[cfg(all(target_arch = "x86_64", windows))]
+pub(crate) fn heap_alloc_iat_slot() -> usize {
+    HEAP_ALLOC_IAT_SLOT.load(Ordering::SeqCst)
+}
+
+/// Address of [`raw_replacement_RtlAllocateHeap`], for the Stalker transformer to call directly.
+#[cfg(all(target_arch = "x86_64", windows))]
+pub(crate) fn raw_replacement_addr() -> usize {
+    raw_replacement_RtlAllocateHeap as usize
+}
+
+/// Address of the target's `HeapFree` IAT slot that `redirect_imports` recorded (0 if not set),
+/// for the Stalker transformer to rewrite `call [__imp_HeapFree]`.
+#[cfg(all(target_arch = "x86_64", windows))]
+pub(crate) fn heap_free_iat_slot() -> usize {
+    HEAP_FREE_IAT_SLOT.load(Ordering::SeqCst)
+}
+
+/// Address of [`raw_replacement_RtlFreeHeap`], for the Stalker transformer to call directly.
+#[cfg(all(target_arch = "x86_64", windows))]
+pub(crate) fn raw_replacement_free_addr() -> usize {
+    raw_replacement_RtlFreeHeap as usize
+}
+
+/// Replacement for `ntdll!RtlAllocateHeap` (installed via `Interceptor::replace`; see
+/// `install_rtl_allocate_heap_detour`).
+#[cfg(all(target_arch = "x86_64", windows))]
+unsafe extern "C" fn raw_replacement_RtlAllocateHeap(
+    handle: *mut c_void,
+    flags: u32,
+    bytes: usize,
+) -> *mut c_void {
+    let Some(detour) = RTL_ALLOCATE_HEAP_DETOUR.get() else {
+        // Only reachable if something allocates before the detour is registered.
+        return core::ptr::null_mut();
+    };
+    let this = unsafe { &mut *(detour.runtime as *mut AsanRuntime) };
+
+    let enabled = ASAN_HOOKS_ENABLED.load(Ordering::SeqCst);
+    let tls = has_tls();
+    let in_hook = ASAN_IN_HOOK.get();
+    if enabled && tls && in_hook == 0 {
+        let _guard = AsanInHookGuard::new();
+        return this.hook_RtlAllocateHeap(detour.original, handle, flags, bytes);
+    }
+    (detour.original)(handle, flags, bytes)
+}
+
+/// Raw replacement for `RtlFreeHeap`, installed as a direct jump on the ntdll export
+/// so that the target's `dealloc` reaches [`AsanRuntime::hook_RtlFreeHeap`] (and thus
+/// [`Allocator::release`], which reports use-after-free/double-free). Mirrors
+/// [`raw_replacement_RtlAllocateHeap`].
+#[cfg(all(target_arch = "x86_64", windows))]
+unsafe extern "C" fn raw_replacement_RtlFreeHeap(
+    handle: *mut c_void,
+    flags: u32,
+    ptr: *mut c_void,
+) -> usize {
+    let Some(detour) = RTL_FREE_HEAP_DETOUR.get() else {
+        // Only reachable if something frees before the detour is registered.
+        return 0;
+    };
+    let this = unsafe { &mut *(detour.runtime as *mut AsanRuntime) };
+
+    let enabled = ASAN_HOOKS_ENABLED.load(Ordering::SeqCst);
+    let tls = has_tls();
+    let in_hook = ASAN_IN_HOOK.get();
+    if enabled && tls && in_hook == 0 {
+        let _guard = AsanInHookGuard::new();
+        return this.hook_RtlFreeHeap(detour.original, handle, flags, ptr);
+    }
+    (detour.original)(handle, flags, ptr)
+}
+
 /// The `FRIDA` address sanitizer runtime, providing address sanitization.
 ///
 /// When executing in `ASan`, each memory access will get checked, using `FRIDA` stalker under the hood.
@@ -313,7 +443,6 @@ pub struct AsanRuntime {
     continue_on_error: bool,
     pc: Option<usize>,
     hooks: Vec<NativePointer>,
-    pub(crate) hooks_enabled: bool,
     // thread_in_hook: ThreadLocal<Cell<bool>>,
     #[cfg(target_arch = "aarch64")]
     eh_frame: [u32; ASAN_EH_FRAME_DWORD_COUNT],
@@ -360,6 +489,11 @@ impl FridaRuntime for AsanRuntime {
             self.register_hooks(gum);
         }
         self.generate_instrumentation_blobs();
+        // On Windows the shadow is committed on demand (see `Allocator::map_shadow_for_region`),
+        // so eagerly unpoisoning *all* existing memory — an address-space-sized shadow commit —
+        // is both unnecessary and extremely slow there. The fuzz input is unpoisoned by
+        // `pre_exec` and fresh allocations by `alloc`, so skipping it on Windows is fine.
+        #[cfg(not(windows))]
         self.unpoison_all_existing_memory();
         self.register_thread();
     }
@@ -369,6 +503,7 @@ impl FridaRuntime for AsanRuntime {
     }
 
     fn pre_exec(&mut self, input_bytes: &[u8]) -> Result<(), libafl::Error> {
+        #[cfg(not(windows))]
         self.unpoison(input_bytes.as_ptr() as usize, input_bytes.len());
         self.enable_hooks();
         Ok(())
@@ -382,6 +517,7 @@ impl FridaRuntime for AsanRuntime {
 
         // # Safety
         // The ptr and length are correct.
+        #[cfg(not(windows))]
         unsafe {
             self.poison(input_bytes.as_ptr() as usize, input_bytes.len());
         }
@@ -462,7 +598,18 @@ impl AsanRuntime {
     /// Add a stalked address to real address mapping.
     #[inline]
     pub fn add_stalked_address(&mut self, stalked: usize, real: usize) {
+        #[cfg(all(target_arch = "x86_64", windows))]
+        {
+            static A: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
+            if A.fetch_add(1, core::sync::atomic::Ordering::SeqCst) < 100000 {
+                log::warn!("ADDSTK-IN stalked={stalked:#x} real={real:#x}");
+            }
+        }
         self.stalked_addresses.insert(stalked, real);
+        #[cfg(all(target_arch = "x86_64", windows))]
+        {
+            log::warn!("ADDSTK-OUT stalked={stalked:#x}");
+        }
     }
 
     /// Resolves the real address from a stalker stalked address if possible, if there is no
@@ -481,19 +628,295 @@ impl AsanRuntime {
 
     /// Enable all function hooks
     pub fn enable_hooks(&mut self) {
-        log::info!("Enabling hooks");
-        self.hooks_enabled = true;
+        log::info!("Enabling hooks depth={}", ASAN_IN_HOOK.get());
+        ASAN_HOOKS_ENABLED.store(true, Ordering::SeqCst);
     }
     /// Disable all function hooks
     pub fn disable_hooks(&mut self) {
-        self.hooks_enabled = false;
+        ASAN_HOOKS_ENABLED.store(false, Ordering::SeqCst);
         log::info!("Disabling hooks");
+    }
+
+    /// Disable the hooks without requiring a `&mut self`.
+    ///
+    /// This is safe to call from the crash handler, where the `runtimes` `RefCell` is still
+    /// mutably borrowed by the interrupted in-process executor and cannot be re-acquired.
+    pub fn disable_asan_hooks_global() {
+        ASAN_HOOKS_ENABLED.store(false, Ordering::SeqCst);
+    }
+
+    /// Called from the Stalker-emitted instrumentation on Windows to check a memory access.
+    ///
+    /// Windows has no fixed shadow (the 16 TiB mapping cannot be committed there), so the
+    /// inline check calls this, which consults the allocator's metadata (bounds + freed status)
+    /// rather than shadow bytes. Returns `true` when the access is within a live allocation.
+    #[cfg(all(target_arch = "x86_64", windows))]
+    extern "system" fn handle_check_access(&mut self, address: usize, size: usize) -> bool {
+        self.allocator_mut().check_access(address, size)
+    }
+
+    /// Install a hook on `ntdll!RtlAllocateHeap`.
+    ///
+    /// We use `Interceptor::replace` (not a raw-detoured prologue patch). The `Interceptor`'s
+    /// relocator produces a correct trampoline that preserves the original stack alignment — a
+    /// hand-rolled trampoline would misalign `rsp` by the compiler's stack frame plus the `call`,
+    /// corrupting the original's `mov [rsp+disp], r64` saves/restores and crashing the heap. The
+    /// replacement uses a global `self` pointer so it also works when reached through the
+    /// `HeapAlloc` IAT rewrite (which `Interceptor::replace` by itself does not intercept).
+    ///
+    /// We use a **raw absolute jump** at `RtlAllocateHeap`'s entry instead of
+    /// `Interceptor::replace`: under the Stalker, Frida's Interceptor integration re-routes a
+    /// recompiled `call [HeapAlloc_IAT]` to the *trampoline* (the original function), so the
+    /// replacement is bypassed. An unconditional patched jump isn't part of the Interceptor
+    /// table, so the Stalker emits a plain call to the entry that necessarily hits our jump.
+    #[cfg(all(target_arch = "x86_64", windows))]
+    #[expect(clippy::missing_safety_doc)]
+    pub unsafe fn install_rtl_allocate_heap_detour(&mut self, _interceptor: &mut Interceptor) {
+        let Some(target) = Module::find_global_export_by_name("RtlAllocateHeap") else {
+            log::warn!("RtlAllocateHeap not found; skipping hook");
+            return;
+        };
+        let self_ptr = core::ptr::from_mut(self) as usize;
+        let replacement = raw_replacement_RtlAllocateHeap as usize;
+        let entry = target.0 as *const u8;
+
+        // Find an instruction boundary that covers at least the 12-byte jump.
+        let decoder = InstDecoder::default();
+        let mut buf = [0u8; 64];
+        core::ptr::copy_nonoverlapping(entry, buf.as_mut_ptr(), buf.len());
+        let mut n = 0usize;
+        while n < 12 && n < 48 {
+            match decoder.decode_slice(&buf[n..]) {
+                Ok(inst) => n += inst.len().to_const() as usize,
+                Err(_) => n += 1,
+            }
+        }
+        if n < 12 || n > 20 {
+            // Sanity: fall back to a fixed 16-byte prologue.
+            n = 16;
+        }
+
+        // Build the fall-through trampoline: re-execute the saved prologue, then jump back to
+        // the instruction after the patched region. No manual stack adjustment, so the original
+        // prologue's `mov [rsp+disp], r64` saves stay correctly aligned.
+        let ts = n + 12;
+        let trampoline_ptr = Memory::allocate(ts, 1, PageProtection::ReadWriteExecute)
+            .expect("failed to allocate RtlAllocateHeap trampoline");
+        let base = trampoline_ptr.0 as *mut u8;
+        core::ptr::copy_nonoverlapping(entry, base, n);
+        let tp = base.add(n);
+        core::ptr::write(tp, 0x48u8); // mov rax, imm64
+        core::ptr::write(tp.add(1), 0xB8u8);
+        core::ptr::copy_nonoverlapping(
+            ((entry as usize) + n).to_le_bytes().as_ptr(),
+            tp.add(2),
+            8,
+        );
+        core::ptr::write(tp.add(10), 0xFFu8); // jmp rax
+        core::ptr::write(tp.add(11), 0xE0u8);
+        FlushInstructionCache(GetCurrentProcess(), base as *const c_void, ts);
+        let original: extern "C" fn(*mut c_void, u32, usize) -> *mut c_void =
+            std::mem::transmute(base);
+
+        // Register the detour *before* patching the entry so that any allocation that happens
+        // during the patch itself (or the transition window) can never see `RTL_ALLOCATE_HEAP_DETOUR`
+        // as unset and return a NULL heap pointer.
+        let _ = RTL_ALLOCATE_HEAP_DETOUR.set(RtlAllocateHeapDetour {
+            runtime: self_ptr,
+            original,
+            iat_slot: 0,
+        });
+
+        // Write `mov rax, imm64(replacement); jmp rax` (12 bytes) + NOP padding at the entry.
+        let mut jump = [0x90u8; 20];
+        jump[0] = 0x48; // mov rax, imm64
+        jump[1] = 0xB8;
+        jump[2..10].copy_from_slice(&replacement.to_le_bytes());
+        jump[10] = 0xFF; // jmp rax
+        jump[11] = 0xE0;
+        Memory::patch_code(target, n, |mem| {
+            core::ptr::copy_nonoverlapping(jump.as_ptr(), mem, n);
+        });
+    }
+
+    /// Register the raw `RtlFreeHeap` detour state (runtime + original export) so the Stalker
+    /// transformer can rewrite `call [__imp_HeapFree]` → [`raw_replacement_RtlFreeHeap`].
+    ///
+    /// Unlike the alloc side there is no raw-jump here: on modern Windows `ntdll!RtlFreeHeap` is a
+    /// forwarder stub whose target is a CFG dispatch stub, so its entry can't be overwritten. The
+    /// interception is instead done entirely in the Stalker transformer (see `helper.rs`), which
+    /// rewrites the target's `call [__imp_HeapFree]` to land on the replacement. The stored `original`
+    /// is the `RtlFreeHeap` export itself — a valid forwarder — and is only exercised on the disabled
+    /// path (hooks off at init/shutdown).
+    #[cfg(all(target_arch = "x86_64", windows))]
+    #[expect(clippy::missing_safety_doc)]
+    pub unsafe fn register_free_heap_detour(&mut self) {
+        let Some(target) = Module::find_global_export_by_name("RtlFreeHeap") else {
+            log::warn!("RtlFreeHeap not found; skipping free hook");
+            return;
+        };
+        let original: extern "C" fn(*mut c_void, u32, *mut c_void) -> usize =
+            std::mem::transmute(target.0 as usize);
+        let _ = RTL_FREE_HEAP_DETOUR.set(RtlFreeHeapDetour {
+            runtime: core::ptr::from_mut(self) as usize,
+            original,
+        });
+    }
+
+    /// Rewrite the process IAT so that `HeapAlloc` (and any other import that resolves to
+    /// `ntdll!RtlAllocateHeap`) points directly at [`raw_replacement_RtlAllocateHeap`].
+    /// Rewrite the `HeapAlloc` IAT slot of the followed modules (the target under test) so the
+    /// forwarder path (used by Rust's allocator and most C++ runtimes) reaches the replacement,
+    /// even when the caller is Stalker-instrumented. Uses the (Windows-fixed) `enumerate_imports`
+    /// to get the per-import IAT slot.
+    #[cfg(all(target_arch = "x86_64", windows))]
+    pub unsafe fn redirect_imports(&mut self) {
+        let replacement = raw_replacement_RtlAllocateHeap as usize;
+        let Some(module_map) = &self.module_map else {
+            return;
+        };
+        for module in module_map.values() {
+            for import in module.enumerate_imports() {
+                match import.name.as_str() {
+                    "HeapAlloc" => {
+                        let slot = import.slot as *mut c_void;
+                        HEAP_ALLOC_IAT_SLOT.store(slot as usize, Ordering::SeqCst);
+                        Memory::mprotect(
+                            NativePointer(slot),
+                            core::mem::size_of::<usize>(),
+                            PageProtection::ReadWrite,
+                        );
+                        Memory::write(NativePointer(slot), &replacement.to_le_bytes());
+                    }
+                    "HeapFree" => {
+                        // Record (but do NOT rewrite) the target's `HeapFree` IAT slot so the
+                        // Stalker transformer can rewrite `call [__imp_HeapFree]` to the free
+                        // replacement (the raw RtlFreeHeap entry is a CFG stub, so this is the
+                        // only reliable interception point).
+                        HEAP_FREE_IAT_SLOT.store(import.slot as usize, Ordering::SeqCst);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    /// Raw-jump the target's Rust allocator chokepoint `process_heap_alloc` (the private
+    /// `std::sys::alloc::windows` helper) straight to [`raw_replacement_RtlAllocateHeap`].
+    ///
+    /// `process_heap_alloc` has the exact same `extern "C" fn(handle: *mut c_void, flags: u32,
+    /// size: usize) -> *mut c_void` signature as the replacement, and it is the single chokepoint
+    /// every `Vec`/`Box` allocation in the target funnels through:
+    ///
+    /// ```text
+    /// parse_heap_overflow
+    ///   -> __rust_alloc_zeroed   (thunk: jmp __rdl_alloc_zeroed)
+    ///   -> __rdl_alloc_zeroed
+    ///   -> process_heap_alloc    (jmp [__imp_HeapAlloc])
+    /// ```
+    ///
+    /// The `jmp [__imp_HeapAlloc]` at its tail resolves through the target's `__imp_HeapAlloc` IAT
+    /// slot; under the Stalker that import gets re-resolved back to the original `RtlAllocateHeap`,
+    /// so neither the IAT rewrite (`redirect_imports`) nor the `RtlAllocateHeap` entry patch are
+    /// observed. Patching `process_heap_alloc` directly — a plain function entry the Stalker cannot
+    /// "un-resolve" from — guarantees every Rust allocation lands on the guard-page allocator.
+    ///
+    /// It is located by scanning the followed module's executable code for the tail `jmp
+    /// [rip+disp32]` (`48 FF 25 …`) of the IAT slot that `redirect_imports()` recorded, then walking
+    /// back to the nearest preceding `ret`/`int3` boundary (its function entry).
+    #[cfg(all(target_arch = "x86_64", windows))]
+    pub unsafe fn install_process_heap_alloc_detour(&mut self) {
+        let replacement = raw_replacement_RtlAllocateHeap as usize;
+        let iat_slot = HEAP_ALLOC_IAT_SLOT.load(Ordering::SeqCst);
+        if iat_slot == 0 {
+            log::warn!("install_process_heap_alloc_detour: IAT slot not set; skipping");
+            return;
+        }
+        let Some(module_map) = &self.module_map else {
+            return;
+        };
+        for module in module_map.values() {
+            let base = module.range().base_address().0 as usize;
+            let size = module.range().size();
+            let text = core::slice::from_raw_parts(base as *const u8, size);
+            let mut i = 0usize;
+            while i + 6 < text.len() {
+                // `jmp [rip+disp32]` is `48 FF 25 disp32`.
+                if text[i] == 0x48 && text[i + 1] == 0xFF && text[i + 2] == 0x25 {
+                    let disp = i32::from_le_bytes([
+                        text[i + 3],
+                        text[i + 4],
+                        text[i + 5],
+                        text[i + 6],
+                    ]) as isize;
+                    let jmp_addr = base + i;
+                    // RIP-relative target: next_instruction (jmp_addr + 7) + disp.
+                    let target = (jmp_addr as isize + 7 + disp) as usize;
+                    if target == iat_slot {
+                        let entry = Self::back_off_to_function_entry(base, jmp_addr);
+                        let mut jump = [0x90u8; 16];
+                        jump[0] = 0x48; // mov rax, imm64
+                        jump[1] = 0xB8;
+                        jump[2..10].copy_from_slice(&replacement.to_le_bytes());
+                        jump[10] = 0xFF; // jmp rax
+                        jump[11] = 0xE0;
+                        Memory::patch_code(
+                            NativePointer(entry as *mut c_void),
+                            12,
+                            |mem| core::ptr::copy_nonoverlapping(jump.as_ptr(), mem, 12),
+                        );
+                        PROCESS_HEAP_ALLOC_ENTRY.store(entry, Ordering::SeqCst);
+                        return;
+                    }
+                }
+                i += 1;
+            }
+        }
+        log::warn!("install_process_heap_alloc_detour: `jmp [__imp_HeapAlloc]` not found in any followed module");
+    }
+
+    /// Walk backwards from `jmp_addr` to the function entry.
+    ///
+    /// The target's `process_heap_alloc` ends with a tail `jmp [rip+disp32]` (not a `ret`), and the
+    /// preceding function may end with a `jmp` too, so scanning for a `ret`/`int3` byte is not
+    /// reliable (a `0xC2` inside e.g. `inc r10` = `49 FF C2` is a false positive). Instead we look
+    /// for the standard Rust/LLVM x64 frame-pointer prologue `push rbp; push rsi; push rdi`
+    /// (`55 56 57`), which immediately precedes the `<sub rsp, …>` body of `process_heap_alloc`.
+    #[cfg(all(target_arch = "x86_64", windows))]
+    fn back_off_to_function_entry(base: usize, jmp_addr: usize) -> usize {
+        let mut p = jmp_addr.saturating_sub(3);
+        let limit = jmp_addr.saturating_sub(256).max(base);
+        while p > limit {
+            let b = unsafe { *(p as *const u8) };
+            let b1 = unsafe { *((p + 1) as *const u8) };
+            let b2 = unsafe { *((p + 2) as *const u8) };
+            if b == 0x55 && b1 == 0x56 && b2 == 0x57 {
+                return p;
+            }
+            p -= 1;
+        }
+        // Fallback: nearest 16-byte-aligned `push rbp`.
+        let mut p = jmp_addr;
+        let limit = jmp_addr.saturating_sub(256).max(base);
+        while p > limit {
+            p -= 1;
+            if p & 0xF == 0 && unsafe { *(p as *const u8) } == 0x55 {
+                return p;
+            }
+        }
+        jmp_addr
     }
 
     /// Register the current thread with the runtime, implementing shadow memory for its stack and
     /// tls mappings.
     #[cfg(not(target_vendor = "apple"))]
     pub fn register_thread(&mut self) {
+        // On Windows there is no shadow (guard pages + metadata detect OOB/UAF),
+        // and mapping shadow for the stack would commit at the 16 TiB address
+        // that Windows cannot handle. So it's a no-op there.
+        #[cfg(windows)]
+        return;
+
         let (stack_start, stack_end) = Self::current_stack();
         let (tls_start, tls_end) = Self::current_tls();
         println!(
@@ -661,9 +1084,9 @@ impl AsanRuntime {
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
                         let original = [<$name:snake:upper _PTR>].get().unwrap();
-                        if this.hooks_enabled {
+                        if ASAN_HOOKS_ENABLED.load(Ordering::SeqCst) {
                             if has_tls() {
-                                if !ASAN_IN_HOOK.get(){
+                                if ASAN_IN_HOOK.get() == 0 {
                                     let _guard = AsanInHookGuard::new(); // Ensure ASAN_IN_HOOK is set and reset
                                     return this.[<hook_ $name>](*original, $($param),*);
                                 }
@@ -711,9 +1134,9 @@ impl AsanRuntime {
                         //is this necessary? The stalked return address will always be the real return address
                      //   let real_address = this.real_address_for_stalked(invocation.return_addr());
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
-                        if this.hooks_enabled {
+                        if ASAN_HOOKS_ENABLED.load(Ordering::SeqCst) {
                             if has_tls() {
-                                if !ASAN_IN_HOOK.get(){
+                                if ASAN_IN_HOOK.get() == 0 {
                                     let _guard = AsanInHookGuard::new(); // Ensure ASAN_IN_HOOK is set and reset
                                     return this.[<hook_ $name>](*original, $($param),*);
                                 }
@@ -755,9 +1178,9 @@ impl AsanRuntime {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
                         let original = [<$name:snake:upper _PTR>].get().unwrap();
-                        if $always_enabled || this.hooks_enabled {
+                        if $always_enabled || ASAN_HOOKS_ENABLED.load(Ordering::SeqCst) {
                             if has_tls() {
-                                if !ASAN_IN_HOOK.get(){
+                                if ASAN_IN_HOOK.get() == 0 {
                                     let _guard = AsanInHookGuard::new(); // Ensure ASAN_IN_HOOK is set and reset
                                     if this.[<hook_check_ $name>]($($param),*){
                                         return this.[<hook_ $name>](*original, $($param),*);
@@ -814,9 +1237,9 @@ impl AsanRuntime {
                         let mut invocation = Interceptor::current_invocation();
                         let this = unsafe { &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime) };
                         let original = [<$lib_ident:snake:upper _ $name:snake:upper _PTR>].get().unwrap();
-                        if $always_enabled || this.hooks_enabled {
+                        if $always_enabled || ASAN_HOOKS_ENABLED.load(Ordering::SeqCst) {
                             if has_tls() {
-                                if !ASAN_IN_HOOK.get(){
+                                if ASAN_IN_HOOK.get() == 0 {
                                     let _guard = AsanInHookGuard::new(); // Ensure ASAN_IN_HOOK is set and reset
                                     if this.[<hook_check_ $name>]($($param),*){
                                         return this.[<hook_ $name>](*original, $($param),*);
@@ -934,7 +1357,6 @@ impl AsanRuntime {
             log::info!("Hooking allocator functions in {}", $libname);
             if let Some(module) = process.find_module_by_name($libname) {
             for export in module.enumerate_exports() {
-                // log::trace!("- {}", export.name);
                 match &export.name[..] {
                     "NtGdiCreateCompatibleDC" => {
                         hook_func!($libname, $lib_ident, NtGdiCreateCompatibleDC, (hdc: *const c_void), *mut c_void);
@@ -949,6 +1371,9 @@ impl AsanRuntime {
                         hook_func!($libname, $lib_ident, HeapAlloc, (handle: *mut c_void, flags: u32, bytes: usize), *mut c_void);
                     }
                     "RtlAllocateHeap" => {
+                        // RtlAllocateHeap is only exported by ntdll. It is raw-detoured in
+                        // install_rtl_allocate_heap_detour() *after* all module hooks below.
+                        #[cfg(not(all(target_arch = "x86_64", windows)))]
                         hook_func!($libname, $lib_ident, RtlAllocateHeap, (handle: *mut c_void, flags: u32, bytes: usize), *mut c_void);
                     }
                     "HeapFree" => {
@@ -1150,6 +1575,31 @@ impl AsanRuntime {
             );
             hook_heap_windows!("api-ms-win-core-memory-l1-1-0", api_ms_memory1);
             hook_heap_windows!("VCRUNTIME140", VCRUNTIME140);
+
+            // `HeapAlloc`/`HeapReAlloc`/`HeapSize` are API-set forwarders that
+            // `enumerate_exports` skips (so the match above never sees them), but
+            // Rust's default allocator and many C++ runtimes import them directly.
+            // Hook them explicitly here.
+            // NOTE: `HeapAlloc` is a forwarder to `ntdll!RtlAllocateHeap`, and we raw-detour
+            // `RtlAllocateHeap` itself below, so we do *not* also hook `HeapAlloc` here.
+            hook_func!("kernel32", kernel32, HeapReAlloc, (handle: *mut c_void, flags: u32, ptr: *mut c_void, size: usize), *mut c_void);
+            hook_func_with_check!("kernel32", kernel32, HeapSize, (handle: *mut c_void, flags: u32, mem: *mut c_void), usize, false);
+
+            // Hook `ntdll!RtlAllocateHeap` *last*, after every module hook has run.
+            #[cfg(all(target_arch = "x86_64", windows))]
+            unsafe {
+                self.install_rtl_allocate_heap_detour(&mut interceptor);
+                // Rewrite the `HeapAlloc` IAT slots so the forwarder path (used by Rust's
+                // allocator and most C++ runtimes) also reaches the replacement, even when the
+                // caller is Stalker-instrumented.
+                self.redirect_imports();
+                // The IAT rewrite above is undone by the Stalker's import re-resolution, so also
+                // patch the Rust allocator's `process_heap_alloc` chokepoint directly.
+                self.install_process_heap_alloc_detour();
+                // Register the free detour state; the Stalker transformer rewrites the target's
+                // `call [__imp_HeapFree]` to reach `release` (use-after-free / double-free).
+                self.register_free_heap_detour();
+            }
         }
 
         /*
@@ -1557,8 +2007,6 @@ impl AsanRuntime {
         // std::thread::sleep(std::time::Duration::from_secs(30));
         self.disable_hooks();
 
-        self.dump_registers();
-
         #[cfg(target_arch = "x86_64")]
         let fault_address = self.regs[17];
         #[cfg(target_arch = "x86")]
@@ -1610,7 +2058,7 @@ impl AsanRuntime {
             }
         }
 
-        let backtrace = Backtrace::new();
+        let backtrace = Backtrace::new_unresolved();
         let (stack_start, stack_end) = Self::current_stack();
 
         if let Some(r) = regs {
@@ -1662,9 +2110,9 @@ impl AsanRuntime {
             } else if base_value.is_some() {
                 if let Some(metadata) = self
                     .allocator
-                    .lock()
-                    .unwrap()
-                    .find_metadata(fault_address, base_value.unwrap())
+                    .try_lock()
+                    .ok()
+                    .and_then(|mut a| a.find_metadata(fault_address, base_value.unwrap()).cloned())
                 {
                     match access_type {
                         Some(typ) => {
@@ -1734,7 +2182,6 @@ impl AsanRuntime {
         // // Sleep for 1 minute to give the user time to attach a debugger
         // std::thread::sleep(std::time::Duration::from_secs(60));
 
-        // self.dump_registers();
         self.enable_hooks();
     }
 
@@ -1925,56 +2372,6 @@ impl AsanRuntime {
         }
     }
 
-    #[cfg(target_arch = "x86_64")]
-    fn dump_registers(&self) {
-        log::info!("rax: {:x}", self.regs[0]);
-        log::info!("rbx: {:x}", self.regs[1]);
-        log::info!("rcx: {:x}", self.regs[2]);
-        log::info!("rdx: {:x}", self.regs[3]);
-        log::info!("rbp: {:x}", self.regs[4]);
-        log::info!("rsp: {:x}", self.regs[5]);
-        log::info!("rsi: {:x}", self.regs[6]);
-        log::info!("rdi: {:x}", self.regs[7]);
-        log::info!("r8: {:x}", self.regs[8]);
-        log::info!("r9: {:x}", self.regs[9]);
-        log::info!("r10: {:x}", self.regs[10]);
-        log::info!("r11: {:x}", self.regs[11]);
-        log::info!("r12: {:x}", self.regs[12]);
-        log::info!("r13: {:x}", self.regs[13]);
-        log::info!("r14: {:x}", self.regs[14]);
-        log::info!("r15: {:x}", self.regs[15]);
-        log::info!("instrumented rip: {:x}", self.regs[16]);
-        log::info!("fault address: {:x}", self.regs[17]);
-        log::info!("actual rip: {:x}", self.regs[18]);
-        log::info!("stack: ");
-        for i in 0..32 {
-            log::info!("{:x}", unsafe {
-                ((self.regs[5] + i * 8) as *const u64).read()
-            });
-        }
-    }
-
-    #[cfg(target_arch = "x86")]
-    fn dump_registers(&self) {
-        log::info!("eax: {:x}", self.regs[0]);
-        log::info!("ebx: {:x}", self.regs[1]);
-        log::info!("ecx: {:x}", self.regs[2]);
-        log::info!("edx: {:x}", self.regs[3]);
-        log::info!("ebp: {:x}", self.regs[4]);
-        log::info!("esp: {:x}", self.regs[5]);
-        log::info!("esi: {:x}", self.regs[6]);
-        log::info!("edi: {:x}", self.regs[7]);
-        log::info!("instrumented eip: {:x}", self.regs[8]);
-        log::info!("fault address: {:x}", self.regs[9]);
-        log::info!("actual eip: {:x}", self.regs[10]);
-        log::info!("stack: ");
-        for i in 0..32 {
-            log::info!("{:x}", unsafe {
-                ((self.regs[5] + i * 4) as *const u32).read()
-            });
-        }
-    }
-
     // https://godbolt.org/z/ah8vG8sWo
     /*
     #include <stdio.h>
@@ -2026,7 +2423,7 @@ impl AsanRuntime {
     The format of a shadow bit is a bitmask. Each bit represents if a byte in the qword is valid starting from the first bit. So, something like 0b11100000 indicates that only the first 3 bytes in the associated qword are valid.
 
     */
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(all(target_arch = "x86_64", not(windows)))]
     fn generate_shadow_check_blob(&mut self, size: u32) -> Box<[u8]> {
         let shadow_bit = self.allocator_mut().shadow_bit();
         // Rcx, Rax, Rdi, Rdx, Rsi, R8 are used, so we save them in emit_shadow_check
@@ -2068,6 +2465,43 @@ impl AsanRuntime {
         shadow_check!(ops, bit);
         let ops_vec = ops.finalize().unwrap();
         ops_vec[..ops_vec.len() - 10].to_vec().into_boxed_slice() //subtract 10 because we don't need the last nop
+    }
+
+    // Windows has no committed shadow, so instead of reading shadow bytes inline, call back
+    // into the runtime's metadata-based bounds/freed check. `rdi` already holds the accessed
+    // address (set up by `emit_shadow_check`).
+    #[cfg(all(target_arch = "x86_64", windows))]
+    fn generate_shadow_check_blob(&mut self, size: u32) -> Box<[u8]> {
+        let self_ptr = core::ptr::from_mut(self) as *mut c_void as i64;
+        let check_fn = AsanRuntime::handle_check_access as *mut c_void as i64;
+        macro_rules! check_access {
+            ($ops:ident, $size:expr) => {dynasm!($ops
+                ; .arch x64
+                ; mov rcx, QWORD self_ptr
+                ; mov rdx, rdi
+                ; mov r8, QWORD $size as i64
+                ; mov rax, QWORD check_fn
+                ; call rax
+                ; test al, al
+                ; jne >done
+                ; lea rsi, [>done]
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ; nop
+                ;done:
+            );};
+        }
+        let mut ops = dynasmrt::VecAssembler::<dynasmrt::x64::X64Relocation>::new(0);
+        check_access!(ops, size);
+        let ops_vec = ops.finalize().unwrap();
+        ops_vec[..ops_vec.len() - 10].to_vec().into_boxed_slice()
     }
 
     // FIXME: later for x86
@@ -3454,7 +3888,6 @@ impl Default for AsanRuntime {
             eh_frame: [0; ASAN_EH_FRAME_DWORD_COUNT],
             pc: None,
             hooks: Vec::new(),
-            hooks_enabled: false,
             // thread_in_hook: ThreadLocal::new(|| Cell::new(false)),
         }
     }

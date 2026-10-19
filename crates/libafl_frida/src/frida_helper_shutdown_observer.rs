@@ -13,6 +13,8 @@ use serde::{
 };
 
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
+#[cfg(windows)]
+use crate::asan::asan_rt::AsanRuntime;
 
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Serialize, Debug)]
@@ -63,6 +65,17 @@ where
 {
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         if *exit_kind == ExitKind::Crash {
+            // On Windows the crash is a native access violation / guard-page fault;
+            // tearing the Stalker down after a hard fault throws a C++ exception
+            // (CPP_EH_EXCEPTION) that re-enters the crash handler and aborts the
+            // save. Skip the full teardown, but still disable the ASan allocator
+            // hooks so the crash handler's allocations don't re-enter them.
+            #[cfg(windows)]
+            {
+                AsanRuntime::disable_asan_hooks_global();
+                return Ok(());
+            }
+
             // Custom implementation logic for `FridaInProcessExecutor`
             log::error!("Custom post_exec called for FridaInProcessExecutorHelper");
             // Add any custom logic specific to FridaInProcessExecutor

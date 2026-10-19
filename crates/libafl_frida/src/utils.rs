@@ -336,7 +336,18 @@ pub fn immediate_value(operand: &Operand) -> Option<i64> {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+/// If the instruction is an indirect `call [rip+disp32]` (`FF 15 <disp32>`), return the
+/// absolute target that the RIP-relative displacement resolves to.
+#[cfg(target_arch = "x86_64")]
+#[must_use]
+pub fn indirect_call_rip_target(address: u64, bytes: &[u8]) -> Option<usize> {
+    if bytes.len() == 6 && bytes[0] == 0xFF && bytes[1] == 0x15 {
+        let disp = i32::from_le_bytes([bytes[2], bytes[3], bytes[4], bytes[5]]);
+        let next = address as i64 + 6;
+        return Some((next + i64::from(disp)) as usize);
+    }
+    None
+}
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 /// What kind of memory access this instruction has
 pub enum AccessType {

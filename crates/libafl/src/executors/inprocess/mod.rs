@@ -737,9 +737,12 @@ pub fn run_observers_and_save_state<E, EM, I, OF, S, Z>(
         new_testcase.add_metadata(exitkind);
         new_testcase.set_parent_id_optional(*state.corpus().current());
 
-        if let Ok(mut tc) = state.current_testcase_mut() {
-            tc.found_objective();
-        }
+        // Skip `current_testcase_mut` + `found_objective` here. After a hard fault the
+        // current testcase is still borrowed by the interrupted executor, and the "no
+        // corpus id" error path allocates a String — which re-crashes against the
+        // corrupted heap. The objective is still recorded below via
+        // `solutions_mut().add`, so this per-testcase counter is just not bumped for
+        // crash paths.
 
         fuzzer
             .objective_mut()
