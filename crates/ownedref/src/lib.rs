@@ -68,7 +68,6 @@ mod arrays {
     use alloc::{boxed::Box, fmt, vec::Vec};
     use core::{convert::TryInto, marker::PhantomData};
 
-    use libafl_core::format;
     use serde::{
         Deserialize, Deserializer,
         de::{SeqAccess, Visitor},
@@ -83,7 +82,7 @@ mod arrays {
         type Value = Box<[T; N]>;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str(&format!("an array of length {N}"))
+            write!(formatter, "an array of length {N}")
         }
 
         #[inline]
@@ -473,7 +472,7 @@ impl<'a, T> OwnedSlice<'a, T> {
         unsafe {
             if ptr.is_null() || len == 0 {
                 Self {
-                    inner: OwnedSliceInner::Owned(Vec::new()),
+                    inner: OwnedSliceInner::Ref(&[]),
                 }
             } else {
                 Self {
@@ -713,7 +712,7 @@ impl<'a, T: 'a + Sized> OwnedMutSlice<'a, T> {
         unsafe {
             if ptr.is_null() || len == 0 {
                 Self {
-                    inner: OwnedMutSliceInner::Owned(Vec::new()),
+                    inner: OwnedMutSliceInner::Ref(&mut []),
                 }
             } else {
                 Self {
@@ -1273,17 +1272,21 @@ mod test {
     fn test_owned_slice_null_ptr_ub() {
         use core::ptr;
 
+        use libafl_core::IntoOwned;
+
         use crate::{OwnedMutSlice, OwnedRef, OwnedSlice};
 
         let s: OwnedSlice<'_, u8> = unsafe { OwnedSlice::from_raw_parts(ptr::null(), 0) };
         assert_eq!(s.len(), 0);
         assert!(s.is_empty());
+        assert!(!s.is_owned());
 
         let mut sm: OwnedMutSlice<'_, u8> =
             unsafe { OwnedMutSlice::from_raw_parts_mut(ptr::null_mut(), 0) };
         sm.reverse();
         assert_eq!(sm.len(), 0);
         assert!(sm.is_empty());
+        assert!(!sm.is_owned());
 
         let val = 42u32;
         let safe_ref = OwnedRef::Ref(&val);

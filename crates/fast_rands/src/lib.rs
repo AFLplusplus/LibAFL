@@ -193,17 +193,19 @@ pub trait Rand {
     /// Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
     #[inline]
     fn between(&mut self, lower_bound_incl: usize, upper_bound_incl: usize) -> usize {
-        assert!(lower_bound_incl <= upper_bound_incl);
+        debug_assert!(lower_bound_incl <= upper_bound_incl);
 
         if upper_bound_incl == usize::MAX && lower_bound_incl == 0 {
             return self.next() as usize;
         }
 
-        // # Safety
-        // We check that `lower_bound_incl <= upper_bound_incl` above, and the `(0, usize::MAX)`
-        // case is handled by the early return, so `upper_bound_incl - lower_bound_incl + 1` is non-zero.
-        lower_bound_incl
-            + self.below(unsafe { NonZero::new_unchecked(upper_bound_incl - lower_bound_incl + 1) })
+        lower_bound_incl.wrapping_add(
+            self.below_or_zero(
+                upper_bound_incl
+                    .wrapping_sub(lower_bound_incl)
+                    .wrapping_add(1),
+            ),
+        )
     }
 
     /// Convenient variant of [`choose`].
@@ -942,6 +944,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(debug_assertions)]
     #[should_panic(expected = "lower_bound_incl <= upper_bound_incl")]
     fn test_between_invalid_bounds_panics() {
         let mut rng = StdRand::with_seed(42);

@@ -3,7 +3,9 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
     hash::Hash,
+    mem::size_of,
     ops::{Deref, DerefMut},
+    slice,
 };
 
 use libafl_bolts::{AsIter, AsIterMut, HasLen, Named, ToSlice, ToSliceMut, Truncate};
@@ -52,22 +54,47 @@ static COUNT_CLASS_LOOKUP_16: [u16; 256 * 256] = {
 
 /// AFL-style classify counts
 #[inline]
+#[expect(clippy::cast_ptr_alignment)]
 pub(crate) fn classify_counts(map: &mut [u8]) {
-    let (prefix, middle, suffix) = unsafe { map.align_to_mut::<u16>() };
+    let mut len = map.len();
+    if len == 0 {
+        return;
+    }
+    let align_offset = map.as_ptr().align_offset(size_of::<u16>());
 
-    for b in prefix {
+    // if len == 1, the next branch will already do this lookup
+    if len > 1 && align_offset != 0 {
+        debug_assert_eq!(
+            align_offset, 1,
+            "Aligning u8 to u16 should always be offset of 1?"
+        );
         unsafe {
-            *b = *COUNT_CLASS_LOOKUP.get_unchecked(*b as usize);
+            *map.get_unchecked_mut(0) =
+                *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(0) as usize);
+        }
+        len -= 1;
+    }
+
+    // Fix the last element
+    if (len & 1) != 0 {
+        let last_idx = map.len() - 1;
+        unsafe {
+            *map.get_unchecked_mut(last_idx) =
+                *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(last_idx) as usize);
         }
     }
-    for item in middle {
-        unsafe {
-            *item = *COUNT_CLASS_LOOKUP_16.get_unchecked(*item as usize);
-        }
+
+    let cnt = len / 2;
+    if cnt == 0 {
+        return;
     }
-    for b in suffix {
+
+    let map16 =
+        unsafe { slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt) };
+
+    for item in &mut map16[0..cnt] {
         unsafe {
-            *b = *COUNT_CLASS_LOOKUP.get_unchecked(*b as usize);
+            *item = *(COUNT_CLASS_LOOKUP_16).get_unchecked(*item as usize);
         }
     }
 }

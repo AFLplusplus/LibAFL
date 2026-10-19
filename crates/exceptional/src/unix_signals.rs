@@ -549,7 +549,7 @@ pub fn ucontext() -> Result<ucontext_t, Error> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "alloc"))]
 mod tests {
     use alloc::{vec, vec::Vec};
     use core::{

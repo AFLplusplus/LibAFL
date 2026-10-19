@@ -495,18 +495,11 @@ const unsafe fn llmp_msg_buf_mut_ptr(msg: *mut LlmpMsg) -> *mut u8 {
 unsafe fn llmp_msg_in_page(page: *const LlmpPage, msg: *const LlmpMsg) -> bool {
     unsafe {
         /* DBG("llmp_msg_in_page %p within %p-%p\n", msg, page, page + page->size_total); */
-        let page_addr = page as usize;
+        let messages_start = (page as usize).wrapping_add(LLMP_PAGE_HEADER_LEN);
         let msg_addr = msg as usize;
-        let Some(messages_start) = page_addr.checked_add(LLMP_PAGE_HEADER_LEN) else {
-            return false;
-        };
-        let Some(page_end) = messages_start.checked_add((*page).size_total) else {
-            return false;
-        };
-        let Some(msg_header_end) = msg_addr.checked_add(size_of::<LlmpMsg>()) else {
-            return false;
-        };
-        msg_addr >= messages_start && msg_header_end <= page_end
+        msg_addr >= messages_start
+            && (msg_addr - messages_start).saturating_add(size_of::<LlmpMsg>())
+                <= (*page).size_total
     }
 }
 
@@ -675,25 +668,18 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
         let map_size = map.map_size;
         let msg_begin_min = page_addr + size_of::<LlmpPage>();
 
-        let Some(max_offset) = map_size.checked_sub(alloc_size) else {
-            return Err(Error::illegal_state(format!(
-                "Inconsistent data on sharedmap, or Bug (alloc_size {alloc_size} > map_size {map_size})"
-            )));
-        };
-        let msg_begin_max = page_addr + max_offset;
-
         let last_msg_addr = last_msg as usize;
         let next_addr = usize::try_from((*last_msg).buf_len_padded)
             .ok()
             .and_then(|padded| size_of::<LlmpMsg>().checked_add(padded))
             .and_then(|step| last_msg_addr.checked_add(step));
 
-        if let Some(next_addr) = next_addr
+        if let Some(max_offset) = map_size.checked_sub(alloc_size)
+            && let Some(next_addr) = next_addr
             && next_addr >= msg_begin_min
-            && next_addr <= msg_begin_max
+            && next_addr <= page_addr + max_offset
         {
-            let offset = next_addr - page_addr;
-            Ok((page as *mut u8).add(offset) as *mut LlmpMsg)
+            Ok((page as *mut u8).with_addr(next_addr) as *mut LlmpMsg)
         } else {
             Err(Error::illegal_state(format!(
                 "Inconsistent data on sharedmap, or Bug (next_ptr was {next_addr:?}, sharedmap page was {page_addr:x})"
@@ -815,9 +801,10 @@ impl LlmpMsg {
     ) -> Result<&'a [u8], Error> {
         if self.in_shmem(map) {
             let page_ptr = unsafe { map.page().cast::<u8>() };
-            let offset = (ptr::from_ref(self) as usize) - (page_ptr as usize) + size_of::<Self>();
-            let len = self.buf_len as usize;
-            let slice = unsafe { slice::from_raw_parts(page_ptr.add(offset), len) };
+            let buf_addr = (ptr::from_ref(self) as usize) + size_of::<Self>();
+            let slice = unsafe {
+                slice::from_raw_parts(page_ptr.with_addr(buf_addr), self.buf_len as usize)
+            };
             Ok(slice)
         } else {
             Err(Error::illegal_state(
@@ -834,9 +821,10 @@ impl LlmpMsg {
     ) -> Result<&'a mut [u8], Error> {
         if self.in_shmem(map) {
             let page_ptr = unsafe { map.page_mut().cast::<u8>() };
-            let offset = (ptr::from_ref(self) as usize) - (page_ptr as usize) + size_of::<Self>();
-            let len = self.buf_len as usize;
-            let slice = unsafe { slice::from_raw_parts_mut(page_ptr.add(offset), len) };
+            let buf_addr = (ptr::from_ref(self) as usize) + size_of::<Self>();
+            let slice = unsafe {
+                slice::from_raw_parts_mut(page_ptr.with_addr(buf_addr), self.buf_len as usize)
+            };
             Ok(slice)
         } else {
             Err(Error::illegal_state(
@@ -1025,11 +1013,11 @@ impl LlmpPage {
     unsafe fn receiver_joined(this: *const Self) {
         let count = unsafe { &(*this).receivers_joined_count };
         #[cfg(target_has_atomic = "16")]
-        count.fetch_add(1, Ordering::Release);
+        count.fetch_add(1, Ordering::Relaxed);
         #[cfg(not(target_has_atomic = "16"))]
         count.store(
-            count.load(Ordering::Acquire).wrapping_add(1),
-            Ordering::Release,
+            count.load(Ordering::Relaxed).wrapping_add(1),
+            Ordering::Relaxed,
         );
     }
 
@@ -1040,7 +1028,7 @@ impl LlmpPage {
         count.fetch_add(1, Ordering::Release);
         #[cfg(not(target_has_atomic = "16"))]
         count.store(
-            count.load(Ordering::Acquire).wrapping_add(1),
+            count.load(Ordering::Relaxed).wrapping_add(1),
             Ordering::Release,
         );
     }
@@ -1188,7 +1176,7 @@ where
             // Exclude the current page by splitting of the last element for this iter
             let mut unmap_until_excl = 0;
             for map in self.out_shmems.split_last_mut().unwrap().1 {
-                if (*map.page()).receivers_joined_count.load(Ordering::Acquire) == 0 {
+                if (*map.page()).receivers_joined_count.load(Ordering::Relaxed) == 0 {
                     // The broker didn't read this page yet, no more pages to unmap.
                     break;
                 }
@@ -1612,7 +1600,7 @@ where
             // log::info!("Reading safe_to_unmap from {:?}", current_out_shmem.page() as *const _);
             (*current_out_shmem.page())
                 .receivers_joined_count
-                .load(Ordering::Acquire)
+                .load(Ordering::Relaxed)
                 >= 1
         }
     }
@@ -1872,7 +1860,7 @@ where
         unsafe {
             if (*current_recv_shmem.page())
                 .receivers_joined_count
-                .load(Ordering::Acquire)
+                .load(Ordering::Relaxed)
                 == 0
             {
                 current_recv_shmem.mark_safe_to_unmap();
@@ -2483,7 +2471,7 @@ impl SignalHandler for LlmpShutdownSignalHandler {
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
     ) {
-        self.shutting_down.store(true, Ordering::Release);
+        self.shutting_down.store(true, Ordering::Relaxed);
     }
 
     fn signals(&self) -> Vec<Signal> {
@@ -2495,7 +2483,7 @@ impl SignalHandler for LlmpShutdownSignalHandler {
 impl CtrlHandler for LlmpShutdownSignalHandler {
     fn handle(&mut self, ctrl_type: u32) -> bool {
         log::info!("LLMP: Received shutdown signal, ctrl_type {ctrl_type:?}");
-        self.shutting_down.store(true, Ordering::Release);
+        self.shutting_down.store(true, Ordering::Relaxed);
         true
     }
 }
@@ -3340,7 +3328,7 @@ where
         // Atomic load.
         unsafe {
             let state_ptr = &raw const LLMP_SIGHANDLER_STATE;
-            (*state_ptr).shutting_down.load(Ordering::Acquire)
+            (*state_ptr).shutting_down.load(Ordering::Relaxed)
         }
     }
 
