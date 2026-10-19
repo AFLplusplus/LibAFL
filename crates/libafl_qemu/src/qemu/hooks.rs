@@ -494,35 +494,138 @@ create_hook_types!(
     >,
     extern "C" fn(
         *const (),
-        i32,
-        GuestUlong,
-        GuestUlong,
-        GuestUlong,
-        GuestUlong,
-        GuestUlong,
-        GuestUlong,
-        GuestUlong,
-        GuestUlong,
+        *mut i32,
+        *mut GuestUlong,
+        *mut GuestUlong,
+        *mut GuestUlong,
+        *mut GuestUlong,
+        *mut GuestUlong,
+        *mut GuestUlong,
+        *mut GuestUlong,
+        *mut GuestUlong,
     ) -> SyscallHookResult
 );
 #[cfg(feature = "usermode")]
 create_hook_id!(PreSyscall, libafl_qemu_remove_pre_syscall_hook, false);
 #[cfg(feature = "usermode")]
-create_wrapper!(
-    pre_syscall,
-    (
-        sys_num: i32,
-        a0: GuestUlong,
-        a1: GuestUlong,
-        a2: GuestUlong,
-        a3: GuestUlong,
-        a4: GuestUlong,
-        a5: GuestUlong,
-        a6: GuestUlong,
-        a7: GuestUlong
-    ),
-    SyscallHookResult
-);
+pub(crate) unsafe extern "C" fn func_pre_syscall_hook_wrapper<ET, I, S>(
+    hook: &mut (),
+    sys_num: *mut i32,
+    a0: *mut GuestUlong,
+    a1: *mut GuestUlong,
+    a2: *mut GuestUlong,
+    a3: *mut GuestUlong,
+    a4: *mut GuestUlong,
+    a5: *mut GuestUlong,
+    a6: *mut GuestUlong,
+    a7: *mut GuestUlong,
+) -> SyscallHookResult
+where
+    I: Unpin,
+    S: Unpin,
+{
+    unsafe {
+        let qemu = Qemu::get_unchecked();
+        let modules = EmulatorModules::<ET, I, S>::emulator_modules_mut_unchecked();
+        let func: fn(
+            Qemu,
+            &mut EmulatorModules<ET, I, S>,
+            Option<&mut S>,
+            i32,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+            GuestUlong,
+        ) -> SyscallHookResult = transmute(ptr::from_mut::<()>(hook));
+        func(
+            qemu,
+            modules,
+            inprocess_get_state::<S>(),
+            *sys_num,
+            *a0,
+            *a1,
+            *a2,
+            *a3,
+            *a4,
+            *a5,
+            *a6,
+            *a7,
+        )
+    }
+}
+
+#[cfg(feature = "usermode")]
+pub(crate) unsafe extern "C" fn closure_pre_syscall_hook_wrapper<ET, I, S>(
+    hook: &mut FatPtr,
+    sys_num: *mut i32,
+    a0: *mut GuestUlong,
+    a1: *mut GuestUlong,
+    a2: *mut GuestUlong,
+    a3: *mut GuestUlong,
+    a4: *mut GuestUlong,
+    a5: *mut GuestUlong,
+    a6: *mut GuestUlong,
+    a7: *mut GuestUlong,
+) -> SyscallHookResult
+where
+    I: Unpin,
+    S: Unpin,
+{
+    unsafe {
+        let qemu = Qemu::get_unchecked();
+        let modules = EmulatorModules::<ET, I, S>::emulator_modules_mut_unchecked();
+        let func: &mut Box<
+            dyn FnMut(
+                Qemu,
+                &mut EmulatorModules<ET, I, S>,
+                Option<&mut S>,
+                i32,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+                GuestUlong,
+            ) -> SyscallHookResult,
+        > = &mut *(ptr::from_mut::<FatPtr>(hook)
+            as *mut Box<
+                dyn FnMut(
+                    Qemu,
+                    &mut EmulatorModules<ET, I, S>,
+                    Option<&mut S>,
+                    i32,
+                    GuestUlong,
+                    GuestUlong,
+                    GuestUlong,
+                    GuestUlong,
+                    GuestUlong,
+                    GuestUlong,
+                    GuestUlong,
+                    GuestUlong,
+                ) -> SyscallHookResult,
+            >);
+        func(
+            qemu,
+            modules,
+            inprocess_get_state::<S>(),
+            *sys_num,
+            *a0,
+            *a1,
+            *a2,
+            *a3,
+            *a4,
+            *a5,
+            *a6,
+            *a7,
+        )
+    }
+}
 
 // Post-syscall hook wrappers
 #[cfg(feature = "usermode")]
@@ -1267,32 +1370,32 @@ impl QemuHooks {
     pub fn add_pre_syscall_hook<T: Into<HookData>>(
         &self,
         data: T,
-        callback: extern "C" fn(
+        callback: unsafe extern "C" fn(
             T,
-            i32,
-            GuestUlong,
-            GuestUlong,
-            GuestUlong,
-            GuestUlong,
-            GuestUlong,
-            GuestUlong,
-            GuestUlong,
-            GuestUlong,
+            *mut i32,
+            *mut GuestUlong,
+            *mut GuestUlong,
+            *mut GuestUlong,
+            *mut GuestUlong,
+            *mut GuestUlong,
+            *mut GuestUlong,
+            *mut GuestUlong,
+            *mut GuestUlong,
         ) -> SyscallHookResult,
     ) -> PreSyscallHookId {
         unsafe {
             let data: u64 = data.into().0;
-            let callback: extern "C" fn(
+            let callback: unsafe extern "C" fn(
                 u64,
-                i32,
-                GuestUlong,
-                GuestUlong,
-                GuestUlong,
-                GuestUlong,
-                GuestUlong,
-                GuestUlong,
-                GuestUlong,
-                GuestUlong,
+                *mut i32,
+                *mut GuestUlong,
+                *mut GuestUlong,
+                *mut GuestUlong,
+                *mut GuestUlong,
+                *mut GuestUlong,
+                *mut GuestUlong,
+                *mut GuestUlong,
+                *mut GuestUlong,
             ) -> libafl_qemu_sys::libafl_syshook_ret = transmute(callback);
             let num = libafl_qemu_sys::libafl_add_pre_syscall_hook(Some(callback), data);
             PreSyscallHookId(num)
