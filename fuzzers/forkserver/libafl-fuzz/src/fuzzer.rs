@@ -283,9 +283,8 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
     // Create our Scheduler
     // Our scheduler can either be a Queue
     // Or a "Weighted Random" which prioritizes entries that take less time and hit more edges
-    let scheduler;
-    if opt.sequential_queue {
-        scheduler = SupportedSchedulers::Queue(QueueScheduler::new(), PhantomData);
+    let scheduler = if opt.sequential_queue {
+        SupportedSchedulers::Queue(QueueScheduler::new(), PhantomData)
     } else {
         let ps = PowerSchedule::new(strategy);
         let mut weighted_scheduler =
@@ -293,11 +292,11 @@ define_run_client!(state, mgr, fuzzer_dir, core_id, opt, is_main_node, {
         if opt.cycle_schedules {
             weighted_scheduler = weighted_scheduler.cycling_scheduler();
         }
-        scheduler = SupportedSchedulers::Weighted(
+        SupportedSchedulers::Weighted(
             IndexesLenTimeMinimizerScheduler::new(&edges_observer, weighted_scheduler),
             PhantomData,
-        );
-    }
+        )
+    };
 
     // Create our Fuzzer
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
