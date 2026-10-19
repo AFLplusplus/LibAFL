@@ -193,15 +193,15 @@ pub trait Rand {
     /// Gets a value between the given lower bound (inclusive) and upper bound (inclusive)
     #[inline]
     fn between(&mut self, lower_bound_incl: usize, upper_bound_incl: usize) -> usize {
-        debug_assert!(lower_bound_incl <= upper_bound_incl);
+        assert!(lower_bound_incl <= upper_bound_incl);
 
         if upper_bound_incl == usize::MAX && lower_bound_incl == 0 {
             return self.next() as usize;
         }
 
         // # Safety
-        // We check that the upper_bound_incl <= lower_bound_incl above (alas only in debug), so the below is fine.
-        // Even if we encounter a 0 in release here, the worst-case scenario should be an invalid return value.
+        // We check that `lower_bound_incl <= upper_bound_incl` above, and the `(0, usize::MAX)`
+        // case is handled by the early return, so `upper_bound_incl - lower_bound_incl + 1` is non-zero.
         lower_bound_incl
             + self.below(unsafe { NonZero::new_unchecked(upper_bound_incl - lower_bound_incl + 1) })
     }
@@ -928,5 +928,23 @@ mod tests {
         assert_ne!(sub_a.next(), sub_c.next());
         sub_b.next();
         assert_eq!(sub_a.next(), sub_b.next());
+    }
+
+    #[test]
+    fn test_between_valid_bounds() {
+        let mut rng = StdRand::with_seed(42);
+        assert_eq!(rng.between(7, 7), 7);
+        for _ in 0..100 {
+            let v = rng.between(10, 20);
+            assert!((10..=20).contains(&v));
+        }
+        let _full = rng.between(0, usize::MAX);
+    }
+
+    #[test]
+    #[should_panic(expected = "lower_bound_incl <= upper_bound_incl")]
+    fn test_between_invalid_bounds_panics() {
+        let mut rng = StdRand::with_seed(42);
+        let _ = rng.between(10, 9);
     }
 }

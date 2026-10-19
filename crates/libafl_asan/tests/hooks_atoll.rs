@@ -115,5 +115,11 @@ mod tests {
     fn atoll_test_empty() {
         let ret = unsafe { atoll(c"".as_ptr() as *const c_char) };
         assert_eq!(ret, 0);
+        let ret_ws = unsafe { atoll(c"   \t\n".as_ptr() as *const c_char) };
+        assert_eq!(ret_ws, 0);
+        let ret_plus = unsafe { atoll(c"+".as_ptr() as *const c_char) };
+        assert_eq!(ret_plus, 0);
+        let ret_minus = unsafe { atoll(c"-".as_ptr() as *const c_char) };
+        assert_eq!(ret_minus, 0);
     }
 }

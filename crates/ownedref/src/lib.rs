@@ -1271,10 +1271,26 @@ mod test {
 
     #[test]
     fn test_owned_slice_null_ptr_ub() {
-        use crate::OwnedSlice;
         use core::ptr;
+
+        use crate::{OwnedMutSlice, OwnedRef, OwnedSlice};
 
         let s: OwnedSlice<'_, u8> = unsafe { OwnedSlice::from_raw_parts(ptr::null(), 0) };
         assert_eq!(s.len(), 0);
+        assert!(s.is_empty());
+
+        let mut sm: OwnedMutSlice<'_, u8> =
+            unsafe { OwnedMutSlice::from_raw_parts_mut(ptr::null_mut(), 0) };
+        sm.reverse();
+        assert_eq!(sm.len(), 0);
+        assert!(sm.is_empty());
+
+        let val = 42u32;
+        let safe_ref = OwnedRef::Ref(&val);
+        assert!(!safe_ref.is_raw());
+        let owned_ref = OwnedRef::owned(42u32);
+        assert!(!owned_ref.is_raw());
+        let raw_ref = unsafe { OwnedRef::from_ptr(&raw const val) };
+        assert!(raw_ref.is_raw());
     }
 }

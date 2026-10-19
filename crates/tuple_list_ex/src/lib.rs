@@ -218,7 +218,10 @@ where
     fn take<T: 'static>(mut self) -> (Option<&'a T>, Self) {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             let r = self.0.take();
-            (unsafe { transmute::<Option<&'a Head>, Option<&'a T>>(r) }, self)
+            (
+                unsafe { transmute::<Option<&'a Head>, Option<&'a T>>(r) },
+                self,
+            )
         } else {
             let (r, tail) = self.1.take::<T>();
             (r, (self.0, tail))

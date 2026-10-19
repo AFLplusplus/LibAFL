@@ -481,7 +481,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::classify_counts;
+    use super::{COUNT_CLASS_LOOKUP, classify_counts};
 
     #[test]
     fn test_classify_counts_various_lengths_and_alignments() {
@@ -496,6 +496,13 @@ mod tests {
                     *b = (i as u8).wrapping_add(1);
                 }
                 classify_counts(slice);
+                for (i, &b) in slice.iter().enumerate() {
+                    let orig = (i as u8).wrapping_add(1);
+                    assert_eq!(
+                        b, COUNT_CLASS_LOOKUP[orig as usize],
+                        "Mismatch at len={len}, offset={offset}, idx={i}"
+                    );
+                }
             }
         }
     }
