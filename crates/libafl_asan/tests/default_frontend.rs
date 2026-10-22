@@ -1,7 +1,9 @@
 #[cfg(all(test, feature = "syscalls", target_os = "linux", feature = "dlmalloc"))]
 mod tests {
+    use core::mem::size_of;
 
     use libafl_asan::{
+        GuestAddr,
         allocator::{
             backend::dlmalloc::DlmallocBackend,
             frontend::{AllocatorFrontend, default::DefaultFrontend},
@@ -31,11 +33,8 @@ mod tests {
         })
     });
 
-    type DF = DefaultFrontend<
-        DlmallocBackend<MmapRegion>,
-        GuestShadow<MmapRegion, DefaultShadowLayout>,
-        GuestTracking,
-    >;
+    type GS = GuestShadow<MmapRegion, DefaultShadowLayout>;
+    type DF = DefaultFrontend<DlmallocBackend<MmapRegion>, GS, GuestTracking>;
 
     fn frontend() -> MutexGuard<'static, DF> {
         INIT_ONCE.lock()
@@ -58,6 +57,14 @@ mod tests {
             let poisoned = frontend.shadow().is_poison(i, 1).unwrap();
             assert_eq!(expected, poisoned);
         }
+        frontend.dealloc(buf).unwrap();
+    }
+
+    #[test]
+    fn test_allocate_min_align_is_shadow_aligned() {
+        let mut frontend = frontend();
+        let buf = frontend.alloc(16, size_of::<GuestAddr>()).unwrap();
+        assert!(buf.is_multiple_of(GS::ALLOC_ALIGN_SIZE));
         frontend.dealloc(buf).unwrap();
     }
 }
