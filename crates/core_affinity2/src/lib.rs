@@ -179,11 +179,7 @@ impl Cores {
 
         // ./fuzzer --cores all -> one client runs in each available core
         if args == "all" {
-            // TODO: is this really correct? Core ID != core number?
-            let num_cores = get_core_ids()?.len();
-            for x in 0..num_cores {
-                cores.push(x.into());
-            }
+            cores = get_core_ids()?;
         } else {
             let core_args: Vec<&str> = args.split(',').collect();
 
