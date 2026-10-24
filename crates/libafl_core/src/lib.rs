@@ -125,7 +125,7 @@ impl ErrorBacktrace {
 
 #[cfg(feature = "errors_backtrace")]
 fn display_error_backtrace(f: &mut fmt::Formatter, err: &ErrorBacktrace) -> fmt::Result {
-    write!(f, "\nBacktrace: {err:?}")
+    write!(f, "\nBacktrace: {err}")
 }
 #[cfg(not(feature = "errors_backtrace"))]
 #[expect(clippy::unnecessary_wraps)]
@@ -938,6 +938,15 @@ mod tests {
 
         let err = Error::illegal_argument("bad_arg");
         assert!(err.to_string().starts_with("Illegal argument: bad_arg"));
+    }
+
+    #[test]
+    #[cfg(feature = "errors_backtrace")]
+    fn test_error_backtrace_display() {
+        let backtrace = ErrorBacktrace::force_capture();
+        let expected = alloc::format!("Runtime error: test\nBacktrace: {backtrace}");
+        let err = Error::Runtime("test".into(), backtrace);
+        assert_eq!(err.to_string(), expected);
     }
 
     #[test]
