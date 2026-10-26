@@ -1117,6 +1117,7 @@ mod test {
         assert!(!type_eq::<u64, usize>());
     }
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn test_type_eq() {
         // An alias for equality testing
