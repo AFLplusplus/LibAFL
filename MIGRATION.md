@@ -1,5 +1,12 @@
 # Migration Notes For LibAFL Versions
 
+## Unreleased
+
+### LibAFL Frida
+
+- `IfElseRuntime` evaluates its condition during initialization and keeps the selected branch for runtime lookup, execution hooks, and deinitialization.
+- Use `FridaRuntimeTuple::match_runtime_mut` to search initialized conditional branches. Custom runtime containers can override `find_runtime_mut` and `match_runtime_mut`; existing implementations retain their flat lookup through the default methods.
+
 ## 0.15.0 -> 0.16.0
 
 ### LibAFL

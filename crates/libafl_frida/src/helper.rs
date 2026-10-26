@@ -1,6 +1,6 @@
 use alloc::rc::Rc;
 use core::{
-    any::TypeId,
+    any::{Any, TypeId},
     cell::{Ref, RefCell, RefMut},
     ffi::CStr,
     fmt::{self, Debug, Formatter},
@@ -39,7 +39,7 @@ use crate::cmplog_rt::CmpLogRuntime;
 use crate::{asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
 
 /// The Runtime trait
-pub trait FridaRuntime: 'static + Debug + core::any::Any {
+pub trait FridaRuntime: 'static + Debug + Any {
     /// Initialization
     fn init(
         &mut self,
@@ -55,6 +55,11 @@ pub trait FridaRuntime: 'static + Debug + core::any::Any {
 
     /// Method called after execution
     fn post_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error>;
+
+    /// Find an initialized nested runtime by its type ID.
+    fn find_runtime_mut(&mut self, _type_id: TypeId) -> Option<&mut dyn Any> {
+        None
+    }
 }
 
 /// Use the runtime if closure evaluates to true
@@ -62,6 +67,7 @@ pub struct IfElseRuntime<CB, FR1, FR2> {
     closure: CB,
     if_runtimes: FR1,
     else_runtimes: FR2,
+    active_branch: Option<bool>,
 }
 
 impl<CB, FR1, FR2> Debug for IfElseRuntime<CB, FR1, FR2>
@@ -82,6 +88,7 @@ impl<CB, FR1, FR2> IfElseRuntime<CB, FR1, FR2> {
             closure,
             if_runtimes,
             else_runtimes,
+            active_branch: None,
         }
     }
 }
@@ -98,39 +105,59 @@ where
         ranges: &RangeMap<u64, (u16, String)>,
         module_map: &Rc<ModuleMap>,
     ) {
-        if (self.closure)().unwrap() {
+        let active_branch = (self.closure)().unwrap();
+        if active_branch {
             self.if_runtimes.init_all(gum, ranges, module_map);
         } else {
             self.else_runtimes.init_all(gum, ranges, module_map);
         }
+        self.active_branch = Some(active_branch);
     }
 
     fn deinit(&mut self, gum: &Gum) {
-        if (self.closure)().unwrap() {
-            self.if_runtimes.deinit_all(gum);
-        } else {
-            self.else_runtimes.deinit_all(gum);
+        match self.active_branch.take() {
+            Some(true) => self.if_runtimes.deinit_all(gum),
+            Some(false) => self.else_runtimes.deinit_all(gum),
+            None => {}
         }
     }
 
     fn pre_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
-        if (self.closure)()? {
-            self.if_runtimes.pre_exec_all(input_bytes)
-        } else {
-            self.else_runtimes.pre_exec_all(input_bytes)
+        match self.active_branch {
+            Some(true) => self.if_runtimes.pre_exec_all(input_bytes),
+            Some(false) => self.else_runtimes.pre_exec_all(input_bytes),
+            None => Ok(()),
         }
     }
 
     fn post_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
-        if (self.closure)()? {
-            self.if_runtimes.post_exec_all(input_bytes)
+        match self.active_branch {
+            Some(true) => self.if_runtimes.post_exec_all(input_bytes),
+            Some(false) => self.else_runtimes.post_exec_all(input_bytes),
+            None => Ok(()),
+        }
+    }
+
+    fn find_runtime_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any> {
+        if self.active_branch? {
+            self.if_runtimes.find_runtime_mut(type_id)
         } else {
-            self.else_runtimes.post_exec_all(input_bytes)
+            self.else_runtimes.find_runtime_mut(type_id)
         }
     }
 }
 /// The tuple for Frida Runtime
 pub trait FridaRuntimeTuple: MatchFirstType + Debug {
+    /// Find a runtime, including initialized conditional branches.
+    fn match_runtime_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.match_first_type_mut()
+    }
+
+    /// Find a runtime by its type ID, including initialized conditional branches.
+    fn find_runtime_mut(&mut self, _type_id: TypeId) -> Option<&mut dyn Any> {
+        None
+    }
+
     /// Initialization
     fn init_all(
         &mut self,
@@ -172,6 +199,19 @@ where
     Head: FridaRuntime,
     Tail: FridaRuntimeTuple,
 {
+    fn match_runtime_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.find_runtime_mut(TypeId::of::<T>())?.downcast_mut()
+    }
+
+    fn find_runtime_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any> {
+        if TypeId::of::<Head>() == type_id {
+            return Some(&mut self.0);
+        }
+        self.0
+            .find_runtime_mut(type_id)
+            .or_else(|| self.1.find_runtime_mut(type_id))
+    }
+
     fn init_all(
         &mut self,
         gum: &Gum,
@@ -205,7 +245,7 @@ pub struct FridaRuntimeVec(pub Vec<Box<dyn FridaRuntime>>);
 impl MatchFirstType for FridaRuntimeVec {
     fn match_first_type<T: 'static>(&self) -> Option<&T> {
         for member in &self.0 {
-            if TypeId::of::<T>() == member.type_id() {
+            if TypeId::of::<T>() == (**member).type_id() {
                 let raw = core::ptr::from_ref::<dyn FridaRuntime>(&**member) as *const T;
                 return unsafe { raw.as_ref() };
             }
@@ -216,7 +256,7 @@ impl MatchFirstType for FridaRuntimeVec {
 
     fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T> {
         for member in &mut self.0 {
-            if TypeId::of::<T>() == member.type_id() {
+            if TypeId::of::<T>() == (**member).type_id() {
                 let raw = core::ptr::from_mut::<dyn FridaRuntime>(&mut **member) as *mut T;
                 return unsafe { raw.as_mut() };
             }
@@ -227,6 +267,22 @@ impl MatchFirstType for FridaRuntimeVec {
 }
 
 impl FridaRuntimeTuple for FridaRuntimeVec {
+    fn match_runtime_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.find_runtime_mut(TypeId::of::<T>())?.downcast_mut()
+    }
+
+    fn find_runtime_mut(&mut self, type_id: TypeId) -> Option<&mut dyn Any> {
+        for runtime in &mut self.0 {
+            if (**runtime).type_id() == type_id {
+                return Some(&mut **runtime);
+            }
+            if let Some(runtime) = runtime.find_runtime_mut(type_id) {
+                return Some(runtime);
+            }
+        }
+        None
+    }
+
     fn init_all(
         &mut self,
         gum: &Gum,
@@ -677,7 +733,7 @@ where
                         address,
                         output.writer().pc()
                     );
-                    if let Some(rt) = runtimes.match_first_type_mut::<CoverageRuntime>() {
+                    if let Some(rt) = runtimes.match_runtime_mut::<CoverageRuntime>() {
                         let start = output.writer().pc();
                         rt.emit_coverage_mapping(address, output);
                         log::trace!(
@@ -687,12 +743,12 @@ where
                             output.writer().pc()
                         );
                     }
-                    if let Some(_rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
+                    if let Some(_rt) = runtimes.match_runtime_mut::<DrCovRuntime>() {
                         basic_block_start = address;
                     }
                 }
 
-                let res = if let Some(_rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
+                let res = if let Some(_rt) = runtimes.match_runtime_mut::<AsanRuntime>() {
                     AsanRuntime::asan_is_interesting_instruction(decoder, address, instr)
                 } else {
                     None
@@ -700,7 +756,7 @@ where
 
                 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 if let Some(details) = res
-                    && let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>()
+                    && let Some(rt) = runtimes.match_runtime_mut::<AsanRuntime>()
                 {
                     let start = output.writer().pc();
                     rt.emit_shadow_check(
@@ -723,7 +779,7 @@ where
 
                 #[cfg(target_arch = "aarch64")]
                 if let Some((basereg, indexreg, displacement, width, shift)) = res
-                    && let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>()
+                    && let Some(rt) = runtimes.match_runtime_mut::<AsanRuntime>()
                 {
                     rt.emit_shadow_check(
                         address,
@@ -740,7 +796,7 @@ where
                     feature = "cmplog",
                     any(target_arch = "aarch64", target_arch = "x86_64")
                 ))]
-                if let Some(rt) = runtimes.match_first_type_mut::<CmpLogRuntime>()
+                if let Some(rt) = runtimes.match_runtime_mut::<CmpLogRuntime>()
                     && let Some((op1, op2, shift, special_case)) =
                         CmpLogRuntime::cmplog_is_interesting_instruction(decoder, address, instr)
                 //change this as well
@@ -749,14 +805,14 @@ where
                     rt.emit_comparison_handling(address, output, &op1, &op2, &shift, &special_case);
                 }
 
-                if let Some(rt) = runtimes.match_first_type_mut::<AsanRuntime>() {
+                if let Some(rt) = runtimes.match_runtime_mut::<AsanRuntime>() {
                     rt.add_stalked_address(
                         output.writer().pc() as usize - instr_size,
                         address as usize,
                     );
                 }
 
-                if let Some(_rt) = runtimes.match_first_type_mut::<DrCovRuntime>() {
+                if let Some(_rt) = runtimes.match_runtime_mut::<DrCovRuntime>() {
                     basic_block_size += instr_size;
                 }
             }
@@ -765,7 +821,7 @@ where
         if basic_block_size != 0
             && let Some(rt) = runtimes_unborrowed
                 .borrow_mut()
-                .match_first_type_mut::<DrCovRuntime>()
+                .match_runtime_mut::<DrCovRuntime>()
         {
             log::trace!("{basic_block_start:#016X}:{basic_block_size:X}");
 
@@ -865,7 +921,7 @@ where
     pub fn map_mut_ptr(&mut self) -> Option<*mut u8> {
         (*self.runtimes)
             .borrow_mut()
-            .match_first_type_mut::<CoverageRuntime>()
+            .match_runtime_mut::<CoverageRuntime>()
             .map(CoverageRuntime::map_mut_ptr)
     }
 
@@ -878,5 +934,215 @@ where
     /// Mutable ranges
     pub fn ranges_mut(&mut self) -> RefMut<'_, RangeMap<u64, (u16, String)>> {
         (*self.ranges).borrow_mut()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::rc::Rc;
+    use core::cell::{Cell, RefCell};
+
+    use frida_gum::{Gum, ModuleMap};
+    use libafl::Error;
+    use libafl_bolts::tuples::{MatchFirstType, tuple_list};
+    use rangemap::RangeMap;
+    use serial_test::serial;
+
+    use super::{
+        CoverageRuntime, FridaInstrumentationHelper, FridaRuntime, FridaRuntimeTuple,
+        FridaRuntimeVec, IfElseRuntime,
+    };
+    use crate::tests::GUM;
+
+    #[derive(Debug)]
+    struct TestRuntime(Rc<RefCell<Vec<&'static str>>>);
+
+    impl FridaRuntime for TestRuntime {
+        fn init(
+            &mut self,
+            _gum: &Gum,
+            _ranges: &RangeMap<u64, (u16, String)>,
+            _module_map: &Rc<ModuleMap>,
+        ) {
+            self.0.borrow_mut().push("init");
+        }
+
+        fn deinit(&mut self, _gum: &Gum) {
+            self.0.borrow_mut().push("deinit");
+        }
+
+        fn pre_exec(&mut self, input_bytes: &[u8]) -> Result<(), Error> {
+            self.0.borrow_mut().push("pre_exec");
+            if input_bytes == b"fail" {
+                return Err(Error::illegal_state("pre_exec failed"));
+            }
+            Ok(())
+        }
+
+        fn post_exec(&mut self, _input_bytes: &[u8]) -> Result<(), Error> {
+            self.0.borrow_mut().push("post_exec");
+            Ok(())
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn conditional_runtime_lifecycle() {
+        let gum = GUM.get_or_init(Gum::obtain).clone();
+        let module_map = Rc::new(ModuleMap::new());
+        for select_if in [true, false] {
+            let if_events = Rc::new(RefCell::new(Vec::new()));
+            let else_events = Rc::new(RefCell::new(Vec::new()));
+            let branch = Rc::new(Cell::new(select_if));
+            let calls = Rc::new(Cell::new(0));
+            let condition = Rc::clone(&branch);
+            let condition_calls = Rc::clone(&calls);
+            let mut runtimes = tuple_list!(IfElseRuntime::new(
+                move || {
+                    condition_calls.set(condition_calls.get() + 1);
+                    Ok(condition.get())
+                },
+                tuple_list!(TestRuntime(Rc::clone(&if_events))),
+                tuple_list!(TestRuntime(Rc::clone(&else_events)))
+            ));
+
+            assert!(runtimes.match_runtime_mut::<TestRuntime>().is_none());
+            runtimes.init_all(&gum, &RangeMap::new(), &module_map);
+            branch.set(!select_if);
+            runtimes
+                .match_runtime_mut::<TestRuntime>()
+                .unwrap()
+                .0
+                .borrow_mut()
+                .push("lookup");
+            assert!(runtimes.pre_exec_all(b"fail").is_err());
+            runtimes.pre_exec_all(b"").unwrap();
+            runtimes.post_exec_all(b"").unwrap();
+            runtimes.deinit_all(&gum);
+            assert!(runtimes.match_runtime_mut::<TestRuntime>().is_none());
+            assert_eq!(calls.get(), 1);
+
+            let (active, inactive) = if select_if {
+                (&if_events, &else_events)
+            } else {
+                (&else_events, &if_events)
+            };
+            assert_eq!(
+                &*active.borrow(),
+                &[
+                    "init",
+                    "lookup",
+                    "pre_exec",
+                    "pre_exec",
+                    "post_exec",
+                    "deinit"
+                ]
+            );
+            assert!(inactive.borrow().is_empty());
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn nested_runtime_lookup() {
+        let gum = GUM.get_or_init(Gum::obtain).clone();
+        let module_map = Rc::new(ModuleMap::new());
+        for outer_branch in [true, false] {
+            for inner_branch in [true, false] {
+                let events: Vec<_> = (0..3).map(|_| Rc::new(RefCell::new(Vec::new()))).collect();
+                let inner = IfElseRuntime::new(
+                    move || Ok(inner_branch),
+                    tuple_list!(TestRuntime(Rc::clone(&events[0]))),
+                    tuple_list!(TestRuntime(Rc::clone(&events[1]))),
+                );
+                let mut runtimes = tuple_list!(
+                    IfElseRuntime::new(
+                        move || Ok(outer_branch),
+                        FridaRuntimeVec(vec![Box::new(inner)]),
+                        ()
+                    ),
+                    TestRuntime(Rc::clone(&events[2]))
+                );
+                runtimes.init_all(&gum, &RangeMap::new(), &module_map);
+                assert!(runtimes.match_runtime_mut::<u64>().is_none());
+                runtimes
+                    .match_runtime_mut::<TestRuntime>()
+                    .unwrap()
+                    .0
+                    .borrow_mut()
+                    .push("lookup");
+                runtimes.deinit_all(&gum);
+
+                let selected = if outer_branch {
+                    usize::from(!inner_branch)
+                } else {
+                    2
+                };
+                for (index, events) in events.iter().enumerate() {
+                    assert_eq!(events.borrow().contains(&"lookup"), index == selected);
+                }
+                if outer_branch {
+                    assert!(events[usize::from(inner_branch)].borrow().is_empty());
+                } else {
+                    assert!(events[0].borrow().is_empty());
+                    assert!(events[1].borrow().is_empty());
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn vector_runtime_lookup() {
+        let gum = GUM.get_or_init(Gum::obtain).clone();
+        let module_map = Rc::new(ModuleMap::new());
+        assert!(
+            FridaRuntimeVec(vec![])
+                .match_runtime_mut::<TestRuntime>()
+                .is_none()
+        );
+        for enabled in [true, false] {
+            let nested_events = Rc::new(RefCell::new(Vec::new()));
+            let direct_events = Rc::new(RefCell::new(Vec::new()));
+            let mut runtimes = FridaRuntimeVec(vec![
+                Box::new(IfElseRuntime::new(
+                    move || Ok(enabled),
+                    tuple_list!(TestRuntime(Rc::clone(&nested_events))),
+                    (),
+                )),
+                Box::new(TestRuntime(Rc::clone(&direct_events))),
+            ]);
+            runtimes.init_all(&gum, &RangeMap::new(), &module_map);
+            assert!(runtimes.match_first_type::<TestRuntime>().is_some());
+            runtimes
+                .match_runtime_mut::<TestRuntime>()
+                .unwrap()
+                .0
+                .borrow_mut()
+                .push("lookup");
+            runtimes.deinit_all(&gum);
+            assert_eq!(nested_events.borrow().contains(&"lookup"), enabled);
+            assert_eq!(direct_events.borrow().contains(&"lookup"), !enabled);
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn conditional_coverage_map() {
+        let gum = GUM.get_or_init(Gum::obtain).clone();
+        for enabled in [true, false] {
+            let mut helper = FridaInstrumentationHelper::builder().build(
+                &gum,
+                tuple_list!(IfElseRuntime::new(
+                    move || Ok(enabled),
+                    tuple_list!(CoverageRuntime::new()),
+                    tuple_list!(CoverageRuntime::new())
+                )),
+            );
+            let found = helper.map_mut_ptr().is_some();
+            helper.deinit(&gum);
+            drop(helper);
+            assert!(found);
+        }
     }
 }

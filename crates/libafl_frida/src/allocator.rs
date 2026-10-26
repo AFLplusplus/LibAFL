@@ -903,7 +903,7 @@ impl Default for Allocator {
 #[test]
 fn check_shadow() {
     use frida_gum::Gum;
-    let _gum = Gum::obtain();
+    let _gum = crate::tests::GUM.get_or_init(Gum::obtain);
     let mut allocator = Allocator::default();
     allocator.init();
 
