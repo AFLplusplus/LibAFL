@@ -390,7 +390,7 @@ mod tests {
     #[global_allocator]
     static GLOBAL: MiMalloc = MiMalloc;
 
-    static GUM: OnceLock<Gum> = OnceLock::new();
+    pub(crate) static GUM: OnceLock<Gum> = OnceLock::new();
 
     #[expect(clippy::too_many_lines)]
     unsafe fn test_asan(options: &FuzzerOptions) {
@@ -621,8 +621,7 @@ mod tests {
             return;
         }
 
-        GUM.set(Gum::obtain())
-            .unwrap_or_else(|_gum| panic!("Failed to initialize Gum."));
+        GUM.get_or_init(Gum::obtain);
         let simulated_args = vec![
             "libafl_frida_test",
             "-A",
