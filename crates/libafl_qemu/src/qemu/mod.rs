@@ -254,7 +254,7 @@ impl QemuParams {
 impl MemAccessInfo {
     #[must_use]
     pub fn memop(&self) -> libafl_qemu_sys::MemOp {
-        libafl_qemu_sys::MemOp(self.oi >> 4)
+        libafl_qemu_sys::MemOp(self.oi >> 5)
     }
 
     #[must_use]
@@ -264,7 +264,7 @@ impl MemAccessInfo {
 
     #[must_use]
     pub fn mmu_index(&self) -> u32 {
-        self.oi & 15
+        self.oi & 31
     }
 
     #[must_use]
