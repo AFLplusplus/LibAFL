@@ -35,8 +35,10 @@ pub unsafe extern "C" fn strncmp(cs: *const c_char, ct: *const c_char, n: size_t
         while ct_len < n && *ct.add(ct_len) != 0 {
             ct_len += 1;
         }
-        asan_load(cs as *const c_void, cs_len + 1);
-        asan_load(ct as *const c_void, ct_len + 1);
+        let cs_check_len = if cs_len < n { cs_len + 1 } else { cs_len };
+        let ct_check_len = if ct_len < n { ct_len + 1 } else { ct_len };
+        asan_load(cs as *const c_void, cs_check_len);
+        asan_load(ct as *const c_void, ct_check_len);
 
         let slice1 = from_raw_parts(cs as *const u8, cs_len);
         let slice2 = from_raw_parts(ct as *const u8, ct_len);

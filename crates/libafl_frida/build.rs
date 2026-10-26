@@ -85,10 +85,8 @@ fn main() {
         );
     } else {
         let compiler = cc::Build::new().cpp(true).opt_level(0).get_compiler();
-        let clangpp = compiler.path();
-        let mut cmd = std::process::Command::new(clangpp);
+        let mut cmd = compiler.to_command();
         let status = cmd
-            .args(compiler.args())
             .arg("-shared")
             .arg("-fPIC")
             .arg("test_harness.cpp")

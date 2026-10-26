@@ -199,26 +199,29 @@ where
 }
 
 /// Returns the first element with the given type (dereference mut version)
-pub trait ExtractFirstRefType {
+pub trait ExtractFirstRefType<'a> {
     /// Returns the first element with the given type as borrow, or [`None`]
-    fn take<'a, T: 'static>(self) -> (Option<&'a T>, Self);
+    fn take<T: 'static>(self) -> (Option<&'a T>, Self);
 }
 
-impl ExtractFirstRefType for () {
-    fn take<'a, T: 'static>(self) -> (Option<&'a T>, Self) {
+impl<'a> ExtractFirstRefType<'a> for () {
+    fn take<T: 'static>(self) -> (Option<&'a T>, Self) {
         tuple_list!(None)
     }
 }
 
-impl<Head, Tail> ExtractFirstRefType for (Option<&Head>, Tail)
+impl<'a, Head, Tail> ExtractFirstRefType<'a> for (Option<&'a Head>, Tail)
 where
     Head: 'static,
-    Tail: ExtractFirstRefType,
+    Tail: ExtractFirstRefType<'a>,
 {
-    fn take<'a, T: 'static>(mut self) -> (Option<&'a T>, Self) {
+    fn take<T: 'static>(mut self) -> (Option<&'a T>, Self) {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             let r = self.0.take();
-            (unsafe { transmute::<Option<&Head>, Option<&T>>(r) }, self)
+            (
+                unsafe { transmute::<Option<&'a Head>, Option<&'a T>>(r) },
+                self,
+            )
         } else {
             let (r, tail) = self.1.take::<T>();
             (r, (self.0, tail))
@@ -226,16 +229,16 @@ where
     }
 }
 
-impl<Head, Tail> ExtractFirstRefType for (Option<&mut Head>, Tail)
+impl<'a, Head, Tail> ExtractFirstRefType<'a> for (Option<&'a mut Head>, Tail)
 where
     Head: 'static,
-    Tail: ExtractFirstRefType,
+    Tail: ExtractFirstRefType<'a>,
 {
-    fn take<'a, T: 'static>(mut self) -> (Option<&'a T>, Self) {
+    fn take<T: 'static>(mut self) -> (Option<&'a T>, Self) {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
-            let r = self.0.take();
+            let r = self.0.take().map(|x| &*x);
             (
-                unsafe { transmute::<Option<&mut Head>, Option<&T>>(r) },
+                unsafe { transmute::<Option<&'a Head>, Option<&'a T>>(r) },
                 self,
             )
         } else {
@@ -246,27 +249,27 @@ where
 }
 
 /// Returns the first element with the given type (dereference mut version)
-pub trait ExtractFirstRefMutType {
+pub trait ExtractFirstRefMutType<'a> {
     /// Returns the first element with the given type as borrow, or [`None`]
-    fn take<'a, T: 'static>(self) -> (Option<&'a mut T>, Self);
+    fn take<T: 'static>(self) -> (Option<&'a mut T>, Self);
 }
 
-impl ExtractFirstRefMutType for () {
-    fn take<'a, T: 'static>(self) -> (Option<&'a mut T>, Self) {
+impl<'a> ExtractFirstRefMutType<'a> for () {
+    fn take<T: 'static>(self) -> (Option<&'a mut T>, Self) {
         tuple_list!(None)
     }
 }
 
-impl<Head, Tail> ExtractFirstRefMutType for (Option<&mut Head>, Tail)
+impl<'a, Head, Tail> ExtractFirstRefMutType<'a> for (Option<&'a mut Head>, Tail)
 where
     Head: 'static,
-    Tail: ExtractFirstRefMutType,
+    Tail: ExtractFirstRefMutType<'a>,
 {
-    fn take<'a, T: 'static>(mut self) -> (Option<&'a mut T>, Self) {
+    fn take<T: 'static>(mut self) -> (Option<&'a mut T>, Self) {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             let r = self.0.take();
             (
-                unsafe { transmute::<Option<&mut Head>, Option<&mut T>>(r) },
+                unsafe { transmute::<Option<&'a mut Head>, Option<&'a mut T>>(r) },
                 self,
             )
         } else {
@@ -279,9 +282,9 @@ where
 /// Borrow each member of the tuple
 pub trait SplitBorrowExtractFirstType<'a> {
     /// The Resulting [`TupleList`], of an [`SplitBorrow::borrow()`] call
-    type SplitBorrowResult: ExtractFirstRefType;
+    type SplitBorrowResult: ExtractFirstRefType<'a>;
     /// The Resulting [`TupleList`], of an [`SplitBorrow::borrow_mut()`] call
-    type SplitBorrowMutResult: ExtractFirstRefType + ExtractFirstRefMutType;
+    type SplitBorrowMutResult: ExtractFirstRefType<'a> + ExtractFirstRefMutType<'a>;
 
     /// Return a tuple of borrowed references
     fn borrow(&'a self) -> Self::SplitBorrowResult;
@@ -1384,6 +1387,16 @@ mod test {
             let tuple_list!(a, b) = tuple;
             assert_eq!(a.0, "a");
             assert_eq!(b.0, "b");
+        }
+
+        #[test]
+        fn test_extract_first_ref_type_safe() {
+            use crate::ExtractFirstRefType;
+
+            let local = String::from("safe memory");
+            let tuple = (Some(&local), ());
+            let (borrowed, _rest) = ExtractFirstRefType::take::<String>(tuple);
+            assert_eq!(borrowed.unwrap().as_str(), "safe memory");
         }
     }
 }
