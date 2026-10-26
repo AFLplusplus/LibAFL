@@ -174,7 +174,7 @@ which = "8.0.5"
 wide = "1.5.0"
 windows = "0.62.2"
 windows-core = "0.62.2"
-z3 = { version = "0.20.2", default-features = false }
+z3 = { version = "0.21.0", default-features = false }
 
 [workspace.lints.rust]
 # Deny

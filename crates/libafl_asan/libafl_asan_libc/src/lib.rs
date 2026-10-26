@@ -37,12 +37,16 @@ extern "C" fn rust_eh_personality() {
 
 #[cfg(target_arch = "powerpc")]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn memcpy(_dest: *mut u8, _src: *const u8, _count: usize) {
+pub unsafe extern "C" fn memcpy(
+    _dest: *mut c_void,
+    _src: *const c_void,
+    _count: usize,
+) -> *mut c_void {
     unimplemented!();
 }
 
 #[cfg(target_arch = "powerpc")]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn memset(_dest: *mut u8, _value: u8, _count: usize) {
+pub unsafe extern "C" fn memset(_dest: *mut c_void, _value: i32, _count: usize) -> *mut c_void {
     unimplemented!();
 }

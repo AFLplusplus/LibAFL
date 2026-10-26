@@ -244,7 +244,7 @@ windows-result = "0.4.1"
 windows = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
-mach2 = "0.6.0"
+mach2 = "0.7.0"
 
 #[profile.release]
 #lto = true

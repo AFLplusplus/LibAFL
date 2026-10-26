@@ -871,7 +871,9 @@ mod apple {
         {
             let mut info = thread_affinity_policy_data_t { affinity_tag: 0 };
             let mut count = THREAD_AFFINITY_POLICY_COUNT;
-            let mut get_default = false;
+            // `thread_policy_get` expects a `*mut boolean_t` (i.e. `*mut u32`) for this
+            // out-parameter, not `*mut bool`.
+            let mut get_default: u32 = 0;
 
             unsafe {
                 use libc::{

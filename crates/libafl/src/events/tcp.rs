@@ -45,6 +45,12 @@ use crate::{
     },
 };
 
+/// Maximum size, in bytes, we are willing to allocate for a single incoming
+/// framed TCP message. Guards against a peer sending a bogus/huge size
+/// prefix and forcing an oversized allocation before any real data has been
+/// validated.
+const TCP_MAX_MSG_LEN: u32 = 128 * 1024 * 1024;
+
 /// Tries to create (synchronously) a [`TcpListener`] that is `nonblocking` (for later use in tokio).
 /// Will error if the port is already in use (or other errors occur)
 fn create_nonblocking_listener<A: ToSocketAddrs>(addr: A) -> Result<TcpListener, Error> {
@@ -131,14 +137,23 @@ where
                 }
 
                 // Asynchronously wait for an inbound socket.
-                let (socket, _) = listener.accept().await.expect("Accept failed");
+                let (socket, _) = match listener.accept().await {
+                    Ok(accepted) => accepted,
+                    Err(e) => {
+                        log::error!("Error accepting tcp connection: {e:?}");
+                        continue;
+                    }
+                };
                 let (mut read, mut write) = tokio::io::split(socket);
 
                 // Protocol: the new client communicate its old ClientId or -1 if new
                 let mut this_client_id = [0; 4];
-                read.read_exact(&mut this_client_id)
-                    .await
-                    .expect("Socket closed?");
+                if read.read_exact(&mut this_client_id).await.is_err() {
+                    // The peer disconnected before sending its client id - ignore and
+                    // keep accepting other connections instead of tearing down the broker.
+                    log::info!("Client disconnected before sending its client id");
+                    continue;
+                }
                 let this_client_id = ClientId(u32::from_le_bytes(this_client_id));
 
                 let (this_client_id, is_old) = if this_client_id == UNDEFINED_CLIENT_ID {
@@ -155,7 +170,10 @@ where
                 let this_client_id_bytes = this_client_id.0.to_le_bytes();
 
                 // Protocol: Send the client id for this node;
-                write.write_all(&this_client_id_bytes).await.unwrap();
+                if let Err(e) = write.write_all(&this_client_id_bytes).await {
+                    log::error!("Error sending client id back to client: {e:?}");
+                    continue;
+                }
 
                 if !is_old && reached_max {
                     continue;
@@ -174,10 +192,20 @@ where
                             return;
                         }
 
-                        let mut len = u32::from_le_bytes(len_buf);
+                        let len = u32::from_le_bytes(len_buf);
                         // we forward the sender id as well, so we add 4 bytes to the message length
-                        len += 4;
+                        let Some(len) = len.checked_add(4) else {
+                            log::error!("TCP message length overflow");
+                            return;
+                        };
                         log::debug!("TCP Manager - len = {len:?}");
+
+                        if len > TCP_MAX_MSG_LEN {
+                            log::error!(
+                                "Refusing to allocate {len} bytes for an incoming tcp message (max {TCP_MAX_MSG_LEN})"
+                            );
+                            return;
+                        }
 
                         let mut buf = vec![0; len as usize];
 
