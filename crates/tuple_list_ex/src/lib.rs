@@ -1101,7 +1101,6 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 mod test {
     use core::marker::PhantomData;
 
-    #[cfg(feature = "alloc")]
     use ownedref::OwnedMutSlice;
     use tuple_list::{tuple_list, tuple_list_type};
 
