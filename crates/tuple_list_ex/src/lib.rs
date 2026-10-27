@@ -1101,7 +1101,6 @@ impl<Head, Tail> PlusOne for (Head, Tail) where
 mod test {
     use core::marker::PhantomData;
 
-    #[cfg(feature = "alloc")]
     use ownedref::OwnedMutSlice;
     use tuple_list::{tuple_list, tuple_list_type};
 
@@ -1117,7 +1116,6 @@ mod test {
         assert!(!type_eq::<u64, usize>());
     }
 
-    #[cfg(feature = "alloc")]
     #[test]
     fn test_type_eq() {
         // An alias for equality testing
