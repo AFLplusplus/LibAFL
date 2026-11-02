@@ -212,7 +212,7 @@ dependencies = [
 
 [[package]]
 name = "build_id2"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ahash",
  "rustversion",
@@ -407,7 +407,7 @@ dependencies = [
 
 [[package]]
 name = "core_affinity2"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "libafl_core",
  "libc",
@@ -627,7 +627,7 @@ dependencies = [
 
 [[package]]
 name = "exceptional"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "libafl_core",
  "libc",
@@ -641,7 +641,7 @@ dependencies = [
 
 [[package]]
 name = "fast_rands"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "rand_core",
  "rustversion",
@@ -744,7 +744,7 @@ dependencies = [
 
 [[package]]
 name = "frida_windows_gdiplus"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "color-backtrace",
  "env_logger",
@@ -1220,7 +1220,7 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "libafl"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ahash",
  "arbitrary-int",
@@ -1260,7 +1260,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_bolts"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ahash",
  "backtrace",
@@ -1277,7 +1277,7 @@ dependencies = [
  "libc",
  "ll_mp",
  "log",
- "mach2 0.6.0",
+ "mach2 0.7.0",
  "minibsod",
  "miniz_oxide 0.9.1",
  "nix 0.31.3",
@@ -1303,7 +1303,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_core"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "backtrace",
  "nix 0.31.3",
@@ -1316,7 +1316,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_derive"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1325,7 +1325,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_frida"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ahash",
  "backtrace",
@@ -1359,7 +1359,7 @@ dependencies = [
 
 [[package]]
 name = "libafl_targets"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "bindgen",
  "cc",
@@ -1445,7 +1445,7 @@ checksum = "92daf443525c4cce67b150400bc2316076100ce0b3686209eb8cf3c31612e6f0"
 
 [[package]]
 name = "ll_mp"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "exceptional",
  "hostname",
@@ -1514,9 +1514,9 @@ dependencies = [
 
 [[package]]
 name = "mach2"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dae608c151f68243f2b000364e1f7b186d9c29845f7d2d85bd31b9ad77ad552b"
+checksum = "b0d28e293f2b8c9d2b2d1c0193bd3c1cbdc0d2cf396888dc01162f7cf9d6c3f3"
 
 [[package]]
 name = "memchr"
@@ -1563,11 +1563,11 @@ dependencies = [
 
 [[package]]
 name = "minibsod"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "exceptional",
  "libc",
- "mach2 0.6.0",
+ "mach2 0.7.0",
  "rustversion",
  "windows 0.62.2",
 ]
@@ -1663,7 +1663,7 @@ dependencies = [
 
 [[package]]
 name = "no_std_time"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "rustversion",
 ]
@@ -1680,7 +1680,7 @@ dependencies = [
 
 [[package]]
 name = "nonzero_macros"
-version = "0.16.0"
+version = "0.16.1"
 
 [[package]]
 name = "num"
@@ -1797,7 +1797,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "ownedref"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "libafl_core",
  "rustversion",
@@ -2162,9 +2162,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.43"
+version = "0.23.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0283386ce02abc0151e1761d08802dfe86c173b0b494af5cbc086574e453da06"
+checksum = "48e13bd8c0e9365c43cfa5c9e8f9ad49d3c8444926c9aac819e0e4dc503c8fdf"
 dependencies = [
  "once_cell",
  "ring",
@@ -2186,9 +2186,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.13"
+version = "0.103.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
+checksum = "4443b1b6d39d7c663139942cc4558262562d2c84123bb6282ef177009ca8b281"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -2243,7 +2243,7 @@ dependencies = [
 
 [[package]]
 name = "serde_anymap"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "ctor",
  "erased-serde",
@@ -2337,7 +2337,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "shmem_providers"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "fast_rands",
  "hashbrown",
@@ -2702,7 +2702,7 @@ checksum = "141fb9f71ee586d956d7d6e4d5a9ef8e946061188520140f7591b668841d502e"
 
 [[package]]
 name = "tuple_list_ex"
-version = "0.16.0"
+version = "0.16.1"
 dependencies = [
  "libafl_core",
  "ownedref",
@@ -3268,9 +3268,9 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 
 [[package]]
 name = "winsafe"
-version = "0.0.28"
+version = "0.0.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d3922ac07e168376bc6799e7896fc737ddb9538be7533ca44bc3463091db1ad"
+checksum = "9ef0ffc427f045c0cc9ebffd6f4f91153dcd2a1547b5c3c29ee3f541e16e95c6"
 
 [[package]]
 name = "wit-bindgen"
