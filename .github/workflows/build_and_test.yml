@@ -1002,7 +1002,8 @@ jobs:
     steps:
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          # libFuzzer renames runtime symbols with the LLVM tools matching rustc.
+          components: clippy, llvm-tools
       - name: Fix PATH for Cargo
         shell: bash
         run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
