@@ -653,247 +653,235 @@ where
         CF: FnOnce(Option<S>, EM, ClientDescription) -> Result<(), Error>,
     {
         #[cfg(unix)]
-        let use_fork = self.fork;
-        #[cfg(not(unix))]
-        let use_fork = false;
-
-        if use_fork {
-            #[cfg(unix)]
-            {
-                if self.cores.ids.is_empty() {
-                    return Err(Error::illegal_argument(
-                        "No cores to spawn on given, cannot launch anything.",
-                    ));
-                }
-
-                if self.run_client.is_none() {
-                    return Err(Error::illegal_argument(
-                        "No client callback provided".to_string(),
-                    ));
-                }
-
-                let core_ids = get_core_ids()?;
-                let mut handles = vec![];
-
-                log::info!("spawning on cores: {:?}", self.cores);
-
-                self.opened_stdout_file = self
-                    .stdout_file
-                    .map(|filename| File::create(filename).unwrap());
-                self.opened_stderr_file = self
-                    .stderr_file
-                    .map(|filename| File::create(filename).unwrap());
-
-                let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
-
-                // Spawn clients
-                let mut index = 0_usize;
-                for bind_to in core_ids {
-                    if self.cores.ids.contains(&bind_to) {
-                        for overcommit_id in 0..self.overcommit {
-                            index += 1;
-                            self.shmem_provider.pre_fork()?;
-                            // # Safety
-                            // Fork is safe in general, apart from potential side effects to the OS and other threads
-                            match unsafe { fork() }? {
-                                ForkResult::Parent(child) => {
-                                    self.shmem_provider.post_fork(false)?;
-                                    handles.push(child.pid);
-                                    log::info!(
-                                        "child spawned with id {index} and bound to core {bind_to:?}"
-                                    );
-                                }
-                                ForkResult::Child => {
-                                    // # Safety
-                                    // A call to `getpid` is safe.
-                                    log::info!("{:?} PostFork", unsafe { libc::getpid() });
-                                    self.shmem_provider.post_fork(true)?;
-
-                                    std::thread::sleep(Duration::from_millis(
-                                        index as u64 * self.launch_delay,
-                                    ));
-
-                                    bind_to.set_affinity()?;
-
-                                    if !debug_output && let Some(file) = &self.opened_stdout_file {
-                                        // # Safety
-                                        // We assume the file descriptors are valid here
-                                        unsafe {
-                                            dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                            match &self.opened_stderr_file {
-                                                Some(stderr) => {
-                                                    dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
-                                                }
-                                                _ => {
-                                                    dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    let client_description =
-                                        ClientDescription::new(index, overcommit_id, bind_to);
-
-                                    let (state, mgr) =
-                                        spawn_mgr(&self, Some(client_description.clone()), None)?;
-
-                                    return (self.run_client.take().unwrap())(
-                                        state,
-                                        mgr,
-                                        client_description,
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if self.spawn_broker {
-                    log::info!("I am broker!!.");
-                    let monitor = self.monitor.take();
-                    match spawn_mgr(&self, None, monitor) {
-                        Ok(_) => {}
-                        Err(Error::ShuttingDown) => {
-                            log::info!("Broker shutting down");
-                        }
-                        Err(e) => {
-                            log::error!("Broker exited with error: {e:?}");
-                        }
-                    }
-                }
-
-                Self::wait_for_pids(&handles, self.spawn_broker);
-            }
-            // This is the fork part for unix
-            #[cfg(not(unix))]
-            {
-                unreachable!("Forking not supported");
-            }
-        } else {
-            // spawn logic
-            let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
-
-            let mut handles = match is_client {
-                Ok(core_conf) => {
-                    let client_description = ClientDescription::from_safe_string(&core_conf);
-                    // the actual client. do the fuzzing
-
-                    client_description.core_id.set_affinity()?;
-
-                    let (state, mgr) = spawn_mgr(&self, Some(client_description.clone()), None)?;
-
-                    return (self.run_client.take().unwrap())(state, mgr, client_description);
-                }
-                Err(std::env::VarError::NotPresent) => {
-                    // I am a broker
-                    // before going to the broker loop, spawn n clients
-
-                    if std::env::var(crate::events::restarting::_ENV_FUZZER_SENDER).is_ok() {
-                        // We are the child of a restarting manager (e.g. the Broker child)
-                        // We should not spawn clients again, but just run the broker logic
-                        if self.spawn_broker {
-                            let monitor = self.monitor.take();
-                            match spawn_mgr(&self, None, monitor) {
-                                Ok(_) => {}
-                                Err(Error::ShuttingDown) => {
-                                    log::info!("Broker shutting down");
-                                }
-                                Err(e) => {
-                                    log::error!("Broker exited with error: {e:?}");
-                                }
-                            }
-                        }
-                        return Ok(());
-                    }
-
-                    let core_ids = get_core_ids().unwrap();
-                    let mut handles = vec![];
-
-                    log::info!("spawning on cores: {:?}", self.cores);
-
-                    let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
-                    #[cfg(unix)]
-                    {
-                        // Set own stdout and stderr as set by the user
-                        if !debug_output {
-                            let opened_stdout_file = self
-                                .stdout_file
-                                .map(|filename| File::create(filename).unwrap());
-                            let opened_stderr_file = self
-                                .stderr_file
-                                .map(|filename| File::create(filename).unwrap());
-                            if let Some(file) = opened_stdout_file {
-                                // # Safety
-                                // We assume the file descriptors are valid here
-                                unsafe {
-                                    dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                                    if let Some(stderr) = opened_stderr_file {
-                                        dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
-                                    } else {
-                                        dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    //spawn clients
-                    let mut index = 0;
-                    for core_id in core_ids {
-                        if self.cores.ids.contains(&core_id) {
-                            for overcommit_i in 0..self.overcommit {
-                                index += 1;
-                                // Forward own stdio to child processes, if requested by user
-                                #[allow(unused_mut)] // mut only on certain cfgs
-                                let (mut stdout, mut stderr) = (Stdio::null(), Stdio::null());
-                                #[cfg(unix)]
-                                {
-                                    if self.stdout_file.is_some() || self.stderr_file.is_some() {
-                                        stdout = Stdio::inherit();
-                                        stderr = Stdio::inherit();
-                                    }
-                                }
-
-                                std::thread::sleep(Duration::from_millis(
-                                    core_id.0 as u64 * self.launch_delay,
-                                ));
-
-                                let client_description =
-                                    ClientDescription::new(index, overcommit_i, core_id);
-                                let mut child = startable_self()?;
-                                child
-                                    .env(_AFL_LAUNCHER_CLIENT, client_description.to_safe_string());
-                                let child = (if debug_output {
-                                    &mut child
-                                } else {
-                                    child.stdout(stdout);
-                                    child.stderr(stderr)
-                                })
-                                .spawn()?;
-                                handles.push(child);
-                            }
-                        }
-                    }
-                    handles
-                }
-                Err(_) => panic!("Env variables are broken, received non-unicode!"),
-            };
-
-            // It's fine to check this after the client spawn loop - since we won't have spawned any clients...
-            // Doing it later means one less check in each spawned process.
+        if self.fork {
             if self.cores.ids.is_empty() {
                 return Err(Error::illegal_argument(
                     "No cores to spawn on given, cannot launch anything.",
                 ));
             }
 
+            if self.run_client.is_none() {
+                return Err(Error::illegal_argument(
+                    "No client callback provided".to_string(),
+                ));
+            }
+
+            let core_ids = get_core_ids()?;
+            let mut handles = vec![];
+
+            log::info!("spawning on cores: {:?}", self.cores);
+
+            self.opened_stdout_file = self
+                .stdout_file
+                .map(|filename| File::create(filename).unwrap());
+            self.opened_stderr_file = self
+                .stderr_file
+                .map(|filename| File::create(filename).unwrap());
+
+            let debug_output = std::env::var(LIBAFL_DEBUG_OUTPUT).is_ok();
+
+            // Spawn clients
+            let mut index = 0_usize;
+            for bind_to in core_ids {
+                if self.cores.ids.contains(&bind_to) {
+                    for overcommit_id in 0..self.overcommit {
+                        index += 1;
+                        self.shmem_provider.pre_fork()?;
+                        // # Safety
+                        // Fork is safe in general, apart from potential side effects to the OS and other threads
+                        match unsafe { fork() }? {
+                            ForkResult::Parent(child) => {
+                                self.shmem_provider.post_fork(false)?;
+                                handles.push(child.pid);
+                                log::info!(
+                                    "child spawned with id {index} and bound to core {bind_to:?}"
+                                );
+                            }
+                            ForkResult::Child => {
+                                // # Safety
+                                // A call to `getpid` is safe.
+                                log::info!("{:?} PostFork", unsafe { libc::getpid() });
+                                self.shmem_provider.post_fork(true)?;
+
+                                std::thread::sleep(Duration::from_millis(
+                                    index as u64 * self.launch_delay,
+                                ));
+
+                                bind_to.set_affinity()?;
+
+                                if !debug_output && let Some(file) = &self.opened_stdout_file {
+                                    // # Safety
+                                    // We assume the file descriptors are valid here
+                                    unsafe {
+                                        dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
+                                        match &self.opened_stderr_file {
+                                            Some(stderr) => {
+                                                dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                                            }
+                                            _ => {
+                                                dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                let client_description =
+                                    ClientDescription::new(index, overcommit_id, bind_to);
+
+                                let (state, mgr) =
+                                    spawn_mgr(&self, Some(client_description.clone()), None)?;
+
+                                return (self.run_client.take().unwrap())(
+                                    state,
+                                    mgr,
+                                    client_description,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
             if self.spawn_broker {
                 log::info!("I am broker!!.");
                 let monitor = self.monitor.take();
-                spawn_mgr(&self, None, monitor)?;
+                match spawn_mgr(&self, None, monitor) {
+                    Ok(_) => {}
+                    Err(Error::ShuttingDown) => {
+                        log::info!("Broker shutting down");
+                    }
+                    Err(e) => {
+                        log::error!("Broker exited with error: {e:?}");
+                    }
+                }
             }
 
-            Self::wait_for_child_processes(&mut handles, self.spawn_broker);
+            Self::wait_for_pids(&handles, self.spawn_broker);
+            return Ok(());
         }
+
+        // spawn logic
+        let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
+
+        let mut handles = match is_client {
+            Ok(core_conf) => {
+                let client_description = ClientDescription::from_safe_string(&core_conf);
+                // the actual client. do the fuzzing
+
+                client_description.core_id.set_affinity()?;
+
+                let (state, mgr) = spawn_mgr(&self, Some(client_description.clone()), None)?;
+
+                return (self.run_client.take().unwrap())(state, mgr, client_description);
+            }
+            Err(std::env::VarError::NotPresent) => {
+                // I am a broker
+                // before going to the broker loop, spawn n clients
+
+                if std::env::var(crate::events::restarting::_ENV_FUZZER_SENDER).is_ok() {
+                    // We are the child of a restarting manager (e.g. the Broker child)
+                    // We should not spawn clients again, but just run the broker logic
+                    if self.spawn_broker {
+                        let monitor = self.monitor.take();
+                        match spawn_mgr(&self, None, monitor) {
+                            Ok(_) => {}
+                            Err(Error::ShuttingDown) => {
+                                log::info!("Broker shutting down");
+                            }
+                            Err(e) => {
+                                log::error!("Broker exited with error: {e:?}");
+                            }
+                        }
+                    }
+                    return Ok(());
+                }
+
+                let core_ids = get_core_ids().unwrap();
+                let mut handles = vec![];
+
+                log::info!("spawning on cores: {:?}", self.cores);
+
+                let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
+                #[cfg(unix)]
+                {
+                    // Set own stdout and stderr as set by the user
+                    if !debug_output {
+                        let opened_stdout_file = self
+                            .stdout_file
+                            .map(|filename| File::create(filename).unwrap());
+                        let opened_stderr_file = self
+                            .stderr_file
+                            .map(|filename| File::create(filename).unwrap());
+                        if let Some(file) = opened_stdout_file {
+                            // # Safety
+                            // We assume the file descriptors are valid here
+                            unsafe {
+                                dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
+                                if let Some(stderr) = opened_stderr_file {
+                                    dup2(stderr.as_raw_fd(), libc::STDERR_FILENO)?;
+                                } else {
+                                    dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                                }
+                            }
+                        }
+                    }
+                }
+                //spawn clients
+                let mut index = 0;
+                for core_id in core_ids {
+                    if self.cores.ids.contains(&core_id) {
+                        for overcommit_i in 0..self.overcommit {
+                            index += 1;
+                            // Forward own stdio to child processes, if requested by user
+                            #[allow(unused_mut)] // mut only on certain cfgs
+                            let (mut stdout, mut stderr) = (Stdio::null(), Stdio::null());
+                            #[cfg(unix)]
+                            {
+                                if self.stdout_file.is_some() || self.stderr_file.is_some() {
+                                    stdout = Stdio::inherit();
+                                    stderr = Stdio::inherit();
+                                }
+                            }
+
+                            std::thread::sleep(Duration::from_millis(
+                                core_id.0 as u64 * self.launch_delay,
+                            ));
+
+                            let client_description =
+                                ClientDescription::new(index, overcommit_i, core_id);
+                            let mut child = startable_self()?;
+                            child.env(_AFL_LAUNCHER_CLIENT, client_description.to_safe_string());
+                            let child = (if debug_output {
+                                &mut child
+                            } else {
+                                child.stdout(stdout);
+                                child.stderr(stderr)
+                            })
+                            .spawn()?;
+                            handles.push(child);
+                        }
+                    }
+                }
+                handles
+            }
+            Err(_) => panic!("Env variables are broken, received non-unicode!"),
+        };
+
+        // It's fine to check this after the client spawn loop - since we won't have spawned any clients...
+        // Doing it later means one less check in each spawned process.
+        if self.cores.ids.is_empty() {
+            return Err(Error::illegal_argument(
+                "No cores to spawn on given, cannot launch anything.",
+            ));
+        }
+
+        if self.spawn_broker {
+            log::info!("I am broker!!.");
+            let monitor = self.monitor.take();
+            spawn_mgr(&self, None, monitor)?;
+        }
+
+        Self::wait_for_child_processes(&mut handles, self.spawn_broker);
         Ok(())
     }
 

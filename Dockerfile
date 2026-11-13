@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.2
-FROM rust:1.91.0 AS libafl
+FROM rust:1.91.0-trixie AS libafl
 LABEL "maintainer"="afl++ team <afl@aflplus.plus>"
 LABEL "about"="LibAFL Docker image"
 
@@ -36,6 +36,9 @@ RUN dpkg --add-architecture i386
 RUN apt-get update && \
     apt-get install -y \
     build-essential \
+    clang-${LLVM_VERSION} \
+    clang-format-${LLVM_VERSION} \
+    clangd-${LLVM_VERSION} \
     cmake \
     curl \
     g++-aarch64-linux-gnu \
@@ -58,6 +61,9 @@ RUN apt-get update && \
     libclang-dev \
     libgcc-12-dev:i386 \
     libglib2.0-dev \
+    lld-${LLVM_VERSION} \
+    lldb-${LLVM_VERSION} \
+    llvm-${LLVM_VERSION}-dev \
     lsb-release \
     ninja-build \
     python3 \
@@ -65,14 +71,6 @@ RUN apt-get update && \
     python3-venv \
     ca-certificates \
     wget
-RUN set -ex &&\
-  wget https://apt.llvm.org/llvm.sh &&\
-  chmod +x llvm.sh &&\
-  ./llvm.sh ${LLVM_VERSION}
-
-RUN apt-get update && \
-  apt-get install -y \
-  clang-format-${LLVM_VERSION}
 
 # Install a modern version of QEMU
 WORKDIR /root

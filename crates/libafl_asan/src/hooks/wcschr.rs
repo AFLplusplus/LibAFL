@@ -6,7 +6,7 @@ use core::{
 
 use log::trace;
 
-use crate::{asan_load, asan_panic, wchar_t};
+use crate::{asan_load, asan_panic, hooks::wcslen::wide_string_len, wchar_t};
 
 /// # Safety
 /// See man pages
@@ -19,10 +19,7 @@ pub unsafe extern "C" fn wcschr(cs: *const wchar_t, c: c_int) -> *mut wchar_t {
             asan_panic(c"wcschr - cs is null".as_ptr() as *const c_char);
         }
 
-        let mut len = 0;
-        while *cs.add(len) != 0 {
-            len += 1;
-        }
+        let len = wide_string_len(cs, usize::MAX);
         asan_load(cs as *const c_void, (len + 1) * size_of::<wchar_t>());
         let cs_slice = from_raw_parts(cs, len);
         let pos = cs_slice.iter().position(|&x| x as c_int == c);

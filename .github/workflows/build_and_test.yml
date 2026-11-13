@@ -760,7 +760,7 @@ jobs:
           cache-all-crates: true
           # Again the artefacts aren't built in the target root directory.
           workspaces: |
-            libafl_qemu/libafl_qemu_asan
+            crates/libafl_qemu/libafl_qemu_asan
       - name: Build
         shell: bash
         run: |
