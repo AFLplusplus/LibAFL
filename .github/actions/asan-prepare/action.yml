@@ -43,7 +43,9 @@ runs:
           qemu-user \
           software-properties-common \
           wget
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ env.CI_RUST_VERSION }}
     - name: install just
       uses: extractions/setup-just@v4
     - name: Install cargo-binstall

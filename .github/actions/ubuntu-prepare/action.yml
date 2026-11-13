@@ -28,8 +28,9 @@ runs:
     # ---------- toolchain selection ----------
     - name: Install Rust (stable)
       if: ${{ inputs.use_nightly == 'false' }}
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@master
       with:
+        toolchain: ${{ env.CI_RUST_VERSION }}
         components: clippy, rustfmt
 
     - name: Install Rust (nightly)
