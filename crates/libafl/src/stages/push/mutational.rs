@@ -299,10 +299,84 @@ where
                 return Some(Err(err));
             }
         } else {
+            self.push_stage_helper_mut().initialized = matches!(ret, Some(Ok(_)));
             self.push_stage_helper_mut().reset_exit_kind();
         }
         self.push_stage_helper_mut()
             .end_of_iter(shared_state, false);
         ret
+    }
+}
+
+#[cfg(all(test, feature = "std"))]
+mod tests {
+    use alloc::rc::Rc;
+    use core::cell::{Cell, RefCell};
+
+    use libafl_bolts::rands::StdRand;
+
+    use super::{DEFAULT_MUTATIONAL_MAX_ITERATIONS, PushStageSharedState, StdMutationalPushStage};
+    use crate::{
+        Error,
+        corpus::{Corpus, InMemoryCorpus, Testcase},
+        events::NopEventManager,
+        executors::ExitKind,
+        feedbacks::{ConstFeedback, CrashFeedback},
+        fuzzer::StdFuzzer,
+        inputs::NopInput,
+        mutators::{MutationResult, NopMutator},
+        schedulers::QueueScheduler,
+        state::{HasCorpus, HasSolutions, StdState},
+    };
+
+    #[test]
+    fn test_iterator_processes_executions() -> Result<(), Error> {
+        let mut feedback = ConstFeedback::True;
+        let mut objective = CrashFeedback::new();
+        let mut state = StdState::new(
+            StdRand::with_seed(0),
+            InMemoryCorpus::new(),
+            InMemoryCorpus::new(),
+            &mut feedback,
+            &mut objective,
+        )?;
+        state.corpus_mut().add(Testcase::new(NopInput::new()))?;
+
+        let fuzzer = StdFuzzer::new(QueueScheduler::new(), feedback, objective);
+        let shared = Rc::new(RefCell::new(Some(PushStageSharedState::new(
+            fuzzer,
+            state,
+            (),
+            NopEventManager::new(),
+        ))));
+        let exit_kind = Rc::new(Cell::new(None));
+        let mut stage = StdMutationalPushStage::new(
+            NopMutator::new(MutationResult::Mutated),
+            Rc::clone(&shared),
+            Rc::clone(&exit_kind),
+        );
+
+        let (mut corpus_count, mut solution_count) = (1, 0);
+        for result in [ExitKind::Ok, ExitKind::Crash] {
+            let mut runs = 0;
+            for input in stage.by_ref().take(DEFAULT_MUTATIONAL_MAX_ITERATIONS + 1) {
+                input?;
+                exit_kind.set(Some(result));
+                runs += 1;
+            }
+            if result == ExitKind::Ok {
+                corpus_count += runs;
+            } else {
+                solution_count += runs;
+            }
+
+            let shared = shared.borrow();
+            let state = &shared.as_ref().unwrap().state;
+            assert_eq!(state.corpus().count(), corpus_count);
+            assert_eq!(state.solutions().count(), solution_count);
+            assert!((1..=DEFAULT_MUTATIONAL_MAX_ITERATIONS).contains(&runs));
+        }
+
+        Ok(())
     }
 }
