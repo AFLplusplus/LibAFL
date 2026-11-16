@@ -12,7 +12,9 @@ runs:
     - name: Remove old rust
       shell: bash
       run: sudo apt purge -y 'rust*' 'cargo*' 'rustup*'
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ env.CI_RUST_VERSION }}
     - name: enable mult-thread for `make`
       shell: bash
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"

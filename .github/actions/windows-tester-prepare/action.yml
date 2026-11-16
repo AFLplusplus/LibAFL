@@ -3,8 +3,9 @@ description: Sets up the Rust environment for the CI workflow
 runs:
   using: composite
   steps:
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@master
       with:
+        toolchain: ${{ env.CI_RUST_VERSION }}
         components: llvm-tools, clippy, rustfmt
     - name: Fix PATH for Cargo
       shell: bash

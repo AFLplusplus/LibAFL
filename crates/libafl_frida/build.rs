@@ -35,17 +35,10 @@ fn main() {
             .cpp(true)
             .file("test_harness.cpp")
             .get_compiler();
-        let mut cmd = std::process::Command::new(compiler.path());
-        let cmd = cmd
-            .args(compiler.args())
-            // Propagate the environment `cc` set up for the compiler (on
-            // MSVC: the INCLUDE/LIB/PATH it discovered via vswhere/registry)
-            // so the direct `cl.exe` invocation works outside a Visual Studio
-            // developer shell, where INCLUDE/LIB are not set. Without this,
-            // cl.exe fails with `C1034: stdint.h: no include path set`.
-            .envs(compiler.env().iter().map(|(key, value)| (key, value)))
-            .arg("test_harness.cpp")
-            .arg("/link");
+        // Preserve the arguments and environment discovered by `cc`, including
+        // MSVC's INCLUDE, LIB, and PATH outside a Visual Studio developer shell.
+        let mut cmd = compiler.to_command();
+        let cmd = cmd.arg("test_harness.cpp").arg("/link");
 
         #[cfg(unix)]
         let cmd = cmd

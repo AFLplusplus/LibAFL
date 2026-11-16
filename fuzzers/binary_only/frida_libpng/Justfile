@@ -68,12 +68,29 @@ test: build harness
 
 _test_unix:
     #!/bin/bash
-    rm -rf libafl_unix_shmem_server || true
-    timeout 30s {{ FUZZER }} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so | tee fuzz_stdout.log 2>/dev/null || true
-    if grep -qa "corpus: 70" fuzz_stdout.log; then
-        echo "Fuzzer is working"
+    set -euo pipefail
+
+    harness="$PWD/libpng-harness.so"
+    corpus="$PWD/corpus"
+    log="$PWD/fuzz_stdout.log"
+    seed_count=$(find -L "$corpus" -type f ! -name '.*' | wc -l)
+    test_dir=$(mktemp -d)
+    trap 'rm -rf -- "$test_dir"' EXIT
+    cd "$test_dir"
+    mkdir corpus_discovered
+
+    status=0
+    timeout 30s "{{ FUZZER }}" -F LLVMFuzzerTestOneInput -H "$harness" -l "$harness" \
+        -i "$corpus" 2>&1 | tee "$log" || status=$?
+    if (( status != 0 && status != 124 )); then
+        exit "$status"
+    fi
+
+    corpus_count=$(find corpus_discovered -type f ! -name '.*' | wc -l)
+    if (( corpus_count > seed_count )); then
+        echo "Fuzzer generated new corpus inputs"
     else
-        echo "Fuzzer does not generate any testcases or any crashes"
+        echo "Fuzzer did not grow the corpus beyond the $seed_count seed inputs" >&2
         exit 1
     fi
 

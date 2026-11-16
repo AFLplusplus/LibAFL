@@ -15,6 +15,8 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_NET_GIT_FETCH_WITH_CLI: true
   MAIN_LLVM_VERSION: 22
+  # Keep the CI toolchain pinned until the Cargo 1.100 layout and Clippy changes are handled.
+  CI_RUST_VERSION: "1.99.1"
   RUST_BACKTRACE: full
 
 concurrency:
@@ -48,7 +50,9 @@ jobs:
       - if: runner.os == 'Linux'
         uses: ./.github/actions/ubuntu-prepare
       - if: runner.os != 'Linux'
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.CI_RUST_VERSION }}
       - name: Fix PATH for Cargo (non-Linux)
         if: runner.os != 'Linux'
         shell: bash
@@ -221,7 +225,7 @@ jobs:
         with:
           components: clippy, rustfmt
       - name: "But default to stable"
-        run: rustup default stable
+        run: rustup default "$CI_RUST_VERSION"
       - name: Check each feature
         # Skipping `python` as it has to be built with the `maturin` tool
         # `sancov_pcguard_edges` is tested seperatelyc
@@ -276,7 +280,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: extractions/setup-just@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.CI_RUST_VERSION }}
       - name: Fix PATH for Cargo
         shell: bash
         run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
@@ -636,7 +642,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y g++-powerpc-linux-gnu gcc-powerpc-linux-gnu gdb-multiarch
       - name: Add rust targets
         shell: bash
-        run: rustup target add --toolchain stable-x86_64-unknown-linux-gnu powerpc-unknown-linux-gnu
+        run: rustup target add --toolchain "$CI_RUST_VERSION" powerpc-unknown-linux-gnu
       - name: Build and run utils (Linux)
         if: runner.os == 'Linux'
         shell: bash
@@ -760,7 +766,7 @@ jobs:
           cache-all-crates: true
           # Again the artefacts aren't built in the target root directory.
           workspaces: |
-            libafl_qemu/libafl_qemu_asan
+            crates/libafl_qemu/libafl_qemu_asan
       - name: Build
         shell: bash
         run: |
@@ -818,8 +824,9 @@ jobs:
   nostd-clippy:
     runs-on: ubuntu-24.04
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.CI_RUST_VERSION }}
           components: clippy, rust-src
       - name: Fix PATH for Cargo
         shell: bash
@@ -982,7 +989,9 @@ jobs:
     needs:
       - common
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.CI_RUST_VERSION }}
       - name: Setup Z3
         id: z3
         uses: cda-tum/setup-z3@v1
@@ -1000,9 +1009,11 @@ jobs:
   macos:
     runs-on: macOS-latest
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
-          components: clippy
+          toolchain: ${{ env.CI_RUST_VERSION }}
+          # libFuzzer renames runtime symbols with the LLVM tools matching rustc.
+          components: clippy, llvm-tools
       - name: Fix PATH for Cargo
         shell: bash
         run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
@@ -1026,7 +1037,9 @@ jobs:
   ubuntu-cross-android-arm64:
     runs-on: ubuntu-24.04
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.CI_RUST_VERSION }}
       - name: Fix PATH for Cargo
         shell: bash
         run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH

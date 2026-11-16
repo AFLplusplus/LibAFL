@@ -5,7 +5,7 @@ use core::{
 
 use log::trace;
 
-use crate::{asan_load, asan_panic, asan_store, wchar_t};
+use crate::{asan_load, asan_panic, asan_store, hooks::wcslen::wide_string_len, wchar_t};
 
 /// # Safety
 /// See man pages
@@ -22,10 +22,7 @@ pub unsafe extern "C" fn wcscpy(dst: *mut wchar_t, src: *const wchar_t) -> *mut 
             asan_panic(c"wcscpy - src is null".as_ptr() as *const c_char);
         }
 
-        let mut len = 0;
-        while *src.add(len) != 0 {
-            len += 1;
-        }
+        let len = wide_string_len(src, usize::MAX);
         asan_load(src as *const c_void, size_of::<wchar_t>() * (len + 1));
         asan_store(dst as *const c_void, size_of::<wchar_t>() * (len + 1));
         copy(src, dst, len + 1);

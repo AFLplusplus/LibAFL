@@ -2,7 +2,7 @@ use core::ffi::{c_char, c_void};
 
 use log::trace;
 
-use crate::{asan_load, asan_panic, size_t, wchar_t};
+use crate::{asan_load, asan_panic, hooks::wcslen::wide_string_len, size_t, wchar_t};
 
 /// # Safety
 /// See man pages
@@ -19,10 +19,7 @@ pub unsafe extern "C" fn wcsnlen(cs: *const wchar_t, maxlen: size_t) -> size_t {
             asan_panic(c"wcsnlen - cs is null".as_ptr() as *const c_char);
         }
 
-        let mut len = 0;
-        while *cs.add(len) != 0 {
-            len += 1;
-        }
+        let len = wide_string_len(cs, maxlen);
 
         if len < maxlen {
             asan_load(cs as *const c_void, (len + 1) * size_of::<wchar_t>());
