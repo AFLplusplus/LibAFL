@@ -1,4 +1,5 @@
 #include "common.h"
+#include <stdint.h>
 
 typedef uint32_t prev_loc_t;
 

@@ -3,6 +3,7 @@
 #define CMPLOG_MODULE
 #include "common.h"
 #include "cmplog.h"
+#include <stdint.h>
 #include <string.h>
 
 #if defined(_WIN32)

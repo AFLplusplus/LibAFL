@@ -341,11 +341,15 @@ pub fn get_thread_id() -> u64 {
 #[cfg(feature = "std")]
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
 #[must_use]
-/// Return thread ID using Rust's `std::thread`
+/// Return thread ID using a thread-local monotonic counter
 pub fn get_thread_id() -> u64 {
-    // Fallback for other platforms
-    let thread_id = std::thread::current().id();
-    unsafe { mem::transmute::<_, u64>(thread_id) }
+    use core::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT_THREAD_ID: AtomicU64 = AtomicU64::new(1);
+    std::thread_local! {
+        static THREAD_ID: u64 = NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed);
+    }
+    THREAD_ID.with(|id| *id)
 }
 
 #[cfg(feature = "std")]
@@ -766,5 +770,20 @@ mod tests {
         }
         log::set_max_level(log::LevelFilter::Debug);
         log::info!("Test");
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    #[cfg_attr(miri, ignore)]
+    fn test_get_thread_id() {
+        use crate::get_thread_id;
+
+        let main_id = get_thread_id();
+        assert_ne!(main_id, 0);
+        assert_eq!(main_id, get_thread_id());
+
+        let child_id = std::thread::spawn(get_thread_id).join().unwrap();
+        assert_ne!(child_id, 0);
+        assert_ne!(child_id, main_id);
     }
 }

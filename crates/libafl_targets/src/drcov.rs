@@ -69,8 +69,8 @@ impl From<DrCovBasicBlockEntry> for [u8; 8] {
     }
 }
 
-impl From<&DrCovBasicBlockEntry> for &[u8] {
-    fn from(value: &DrCovBasicBlockEntry) -> Self {
+impl<'a> From<&'a DrCovBasicBlockEntry> for &'a [u8] {
+    fn from(value: &'a DrCovBasicBlockEntry) -> Self {
         // # Safety
         // The value is a c struct.
         // Casting its pointer to bytes should be safe.
@@ -625,5 +625,16 @@ mod test {
 
         first.merge(&second, true).unwrap();
         assert_eq!(first.basic_block_entries.len(), 2);
+    }
+
+    #[test]
+    fn test_drcov_from_lifetime() {
+        let entry = DrCovBasicBlockEntry {
+            start: 0x1234,
+            size: 0x56,
+            mod_id: 0x78,
+        };
+        let slice: &[u8] = <&[u8]>::from(&entry);
+        assert_eq!(slice.len(), 8);
     }
 }

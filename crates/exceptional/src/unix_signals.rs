@@ -436,18 +436,22 @@ static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
 #[cfg(feature = "alloc")]
 unsafe fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
     unsafe {
-        let signal = &Signal::try_from(sig).unwrap();
+        let Ok(signal) = Signal::try_from(sig) else {
+            return;
+        };
         let handler = {
-            match &SIGNAL_HANDLERS[*signal as usize] {
+            let slot = &raw const SIGNAL_HANDLERS[signal as usize];
+            match &*slot {
                 Some(handler_holder) => &mut **handler_holder.handler.get(),
                 None => return,
             }
         };
-        handler.handle(
-            *signal,
-            &mut ptr::read_unaligned(info),
-            (void as *mut ucontext_t).as_mut(),
-        );
+        let mut info_val = if info.is_null() {
+            mem::zeroed()
+        } else {
+            ptr::read_unaligned(info)
+        };
+        handler.handle(signal, &mut info_val, (void as *mut ucontext_t).as_mut());
     }
 }
 
@@ -542,5 +546,64 @@ pub fn ucontext() -> Result<ucontext_t, Error> {
         }
     } else {
         Ok(ucontext)
+    }
+}
+
+#[cfg(all(test, feature = "alloc"))]
+mod tests {
+    use alloc::{vec, vec::Vec};
+    use core::{
+        cell::UnsafeCell,
+        ptr::{self, write_volatile},
+        sync::atomic::{AtomicUsize, Ordering},
+    };
+
+    use super::{
+        HandlerHolder, SIGNAL_HANDLERS, Signal, SignalHandler, handle_signal, siginfo_t, ucontext_t,
+    };
+
+    struct CountingHandler {
+        calls: AtomicUsize,
+    }
+
+    impl SignalHandler for CountingHandler {
+        unsafe fn handle(
+            &mut self,
+            _signal: Signal,
+            info: &mut siginfo_t,
+            _context: Option<&mut ucontext_t>,
+        ) {
+            assert_eq!(info.si_signo, 0);
+            self.calls.fetch_add(1, Ordering::SeqCst);
+        }
+
+        fn signals(&self) -> Vec<Signal> {
+            vec![Signal::SigUser2]
+        }
+    }
+
+    #[test]
+    fn test_handle_signal_null_info_and_unknown() {
+        let mut handler = CountingHandler {
+            calls: AtomicUsize::new(0),
+        };
+        unsafe {
+            // Unknown signal number and unregistered signal should gracefully return:
+            handle_signal(999, ptr::null_mut(), ptr::null_mut());
+            handle_signal(Signal::SigHangUp as i32, ptr::null_mut(), ptr::null_mut());
+            assert_eq!(handler.calls.load(Ordering::SeqCst), 0);
+
+            // Registered signal with null `siginfo_t` should invoke handler with zeroed `siginfo_t`:
+            let handler_ptr: *mut dyn SignalHandler = &raw mut handler;
+            write_volatile(
+                &raw mut SIGNAL_HANDLERS[Signal::SigUser2 as usize],
+                Some(HandlerHolder {
+                    handler: UnsafeCell::new(handler_ptr),
+                }),
+            );
+            handle_signal(Signal::SigUser2 as i32, ptr::null_mut(), ptr::null_mut());
+            write_volatile(&raw mut SIGNAL_HANDLERS[Signal::SigUser2 as usize], None);
+            assert_eq!(handler.calls.load(Ordering::SeqCst), 1);
+        }
     }
 }

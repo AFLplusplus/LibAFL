@@ -57,6 +57,9 @@ static COUNT_CLASS_LOOKUP_16: [u16; 256 * 256] = {
 #[expect(clippy::cast_ptr_alignment)]
 pub(crate) fn classify_counts(map: &mut [u8]) {
     let mut len = map.len();
+    if len == 0 {
+        return;
+    }
     let align_offset = map.as_ptr().align_offset(size_of::<u16>());
 
     // if len == 1, the next branch will already do this lookup
@@ -74,13 +77,17 @@ pub(crate) fn classify_counts(map: &mut [u8]) {
 
     // Fix the last element
     if (len & 1) != 0 {
+        let last_idx = map.len() - 1;
         unsafe {
-            *map.get_unchecked_mut(len - 1) =
-                *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(len - 1) as usize);
+            *map.get_unchecked_mut(last_idx) =
+                *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(last_idx) as usize);
         }
     }
 
     let cnt = len / 2;
+    if cnt == 0 {
+        return;
+    }
 
     let map16 =
         unsafe { slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt) };
@@ -496,5 +503,34 @@ where
 
     fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
         self.base.as_iter_mut()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{COUNT_CLASS_LOOKUP, classify_counts};
+
+    #[test]
+    fn test_classify_counts_various_lengths_and_alignments() {
+        for len in 0..64 {
+            let mut data = vec![0u8; len + 1];
+            for offset in 0..=1 {
+                if offset + len > data.len() {
+                    continue;
+                }
+                let slice = &mut data[offset..offset + len];
+                for (i, b) in slice.iter_mut().enumerate() {
+                    *b = (i as u8).wrapping_add(1);
+                }
+                classify_counts(slice);
+                for (i, &b) in slice.iter().enumerate() {
+                    let orig = (i as u8).wrapping_add(1);
+                    assert_eq!(
+                        b, COUNT_CLASS_LOOKUP[orig as usize],
+                        "Mismatch at len={len}, offset={offset}, idx={i}"
+                    );
+                }
+            }
+        }
     }
 }

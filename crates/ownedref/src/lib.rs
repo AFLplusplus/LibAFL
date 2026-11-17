@@ -68,7 +68,6 @@ mod arrays {
     use alloc::{boxed::Box, fmt, vec::Vec};
     use core::{convert::TryInto, marker::PhantomData};
 
-    use libafl_core::format;
     use serde::{
         Deserialize, Deserializer,
         de::{SeqAccess, Visitor},
@@ -83,7 +82,7 @@ mod arrays {
         type Value = Box<[T; N]>;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str(&format!("an array of length {N}"))
+            write!(formatter, "an array of length {N}")
         }
 
         #[inline]
@@ -195,7 +194,7 @@ where
     /// Returns true if the inner ref is a raw pointer, false otherwise.
     #[must_use]
     pub fn is_raw(&self) -> bool {
-        matches!(self, OwnedRef::Ref(_))
+        matches!(self, OwnedRef::RefRaw(..))
     }
 
     /// Return the inner value, if owned by the given object
@@ -471,8 +470,14 @@ impl<'a, T> OwnedSlice<'a, T> {
     #[must_use]
     pub unsafe fn from_raw_parts(ptr: *const T, len: usize) -> Self {
         unsafe {
-            Self {
-                inner: OwnedSliceInner::RefRaw(ptr, len, UnsafeMarker::new()),
+            if ptr.is_null() || len == 0 {
+                Self {
+                    inner: OwnedSliceInner::Ref(&[]),
+                }
+            } else {
+                Self {
+                    inner: OwnedSliceInner::RefRaw(ptr, len, UnsafeMarker::new()),
+                }
             }
         }
     }
@@ -707,7 +712,7 @@ impl<'a, T: 'a + Sized> OwnedMutSlice<'a, T> {
         unsafe {
             if ptr.is_null() || len == 0 {
                 Self {
-                    inner: OwnedMutSliceInner::Owned(Vec::new()),
+                    inner: OwnedMutSliceInner::Ref(&mut []),
                 }
             } else {
                 Self {
@@ -1261,5 +1266,34 @@ mod test {
         slice.truncate(0);
         slice.truncate(100);
         assert_eq!(0, slice.len());
+    }
+
+    #[test]
+    fn test_owned_slice_null_ptr_ub() {
+        use core::ptr;
+
+        use libafl_core::IntoOwned;
+
+        use crate::{OwnedMutSlice, OwnedRef, OwnedSlice};
+
+        let s: OwnedSlice<'_, u8> = unsafe { OwnedSlice::from_raw_parts(ptr::null(), 0) };
+        assert_eq!(s.len(), 0);
+        assert!(s.is_empty());
+        assert!(!s.is_owned());
+
+        let mut sm: OwnedMutSlice<'_, u8> =
+            unsafe { OwnedMutSlice::from_raw_parts_mut(ptr::null_mut(), 0) };
+        sm.reverse();
+        assert_eq!(sm.len(), 0);
+        assert!(sm.is_empty());
+        assert!(!sm.is_owned());
+
+        let val = 42u32;
+        let safe_ref = OwnedRef::Ref(&val);
+        assert!(!safe_ref.is_raw());
+        let owned_ref = OwnedRef::owned(42u32);
+        assert!(!owned_ref.is_raw());
+        let raw_ref = unsafe { OwnedRef::from_ptr(&raw const val) };
+        assert!(raw_ref.is_raw());
     }
 }

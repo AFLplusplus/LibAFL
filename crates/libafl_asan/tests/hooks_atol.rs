@@ -144,4 +144,16 @@ mod tests {
         unsafe { atol(c"-9223372036854775809".as_ptr() as *const c_char) };
         unreachable!();
     }
+
+    #[test]
+    fn atol_test_empty() {
+        let ret = unsafe { atol(c"".as_ptr() as *const c_char) };
+        assert_eq!(ret, 0);
+        let ret_ws = unsafe { atol(c"   \t\n".as_ptr() as *const c_char) };
+        assert_eq!(ret_ws, 0);
+        let ret_plus = unsafe { atol(c"+".as_ptr() as *const c_char) };
+        assert_eq!(ret_plus, 0);
+        let ret_minus = unsafe { atol(c"-".as_ptr() as *const c_char) };
+        assert_eq!(ret_minus, 0);
+    }
 }

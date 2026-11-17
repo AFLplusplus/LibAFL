@@ -35,20 +35,22 @@ pub unsafe extern "C" fn atoll(s: *const c_char) -> c_longlong {
             0x9,  /* \t */
             0xb,  /* \v */
         ];
-        while ws.contains(&slice[i]) {
+        while i < len && ws.contains(&slice[i]) {
             i += 1;
         }
 
         let mut negative = false;
-        if slice[i] == 0x2d
-        /* '-' */
-        {
-            negative = true;
-            i += 1;
-        } else if slice[i] == 0x2b
-        /* '+' */
-        {
-            i += 1;
+        if i < len {
+            if slice[i] == 0x2d
+            /* '-' */
+            {
+                negative = true;
+                i += 1;
+            } else if slice[i] == 0x2b
+            /* '+' */
+            {
+                i += 1;
+            }
         }
 
         let mut val = 0 as c_ulonglong;
