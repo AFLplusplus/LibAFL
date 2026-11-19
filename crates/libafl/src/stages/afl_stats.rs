@@ -100,6 +100,8 @@ pub struct AflStatsStage<C, I, O> {
     last_report_time: Duration,
     // the interval at which we report all stats
     stats_report_interval: Duration,
+    // (time, total executions) at the previous stats report, used to compute `execs_per_sec`
+    last_execs_sample: Option<(Duration, u64)>,
     pid: u32,
     slowest_exec: Duration,
     max_depth: u64,
@@ -308,6 +310,7 @@ where
 
         let corpus_size = state.corpus().count();
         let total_executions = *state.executions();
+        let execs_per_sec = self.update_execs_per_sec(total_executions);
 
         let scheduler = fuzzer.scheduler();
         let queue_cycles = scheduler.queue_cycles();
@@ -359,7 +362,7 @@ where
                 .as_secs(),
             trim_time: 0, // TODO
             execs_done: total_executions,
-            execs_per_sec: *state.executions(),     // TODO
+            execs_per_sec,
             execs_ps_last_min: *state.executions(), // TODO
             max_depth: self.max_depth,
             corpus_count: corpus_size,
@@ -617,6 +620,13 @@ where
         }
     }
 
+    fn update_execs_per_sec(&mut self, total_executions: u64) -> u64 {
+        let now = current_time();
+        let rate = calculate_execs_per_sec(self.last_execs_sample, now, total_executions);
+        self.last_execs_sample = Some((now, total_executions));
+        rate
+    }
+
     fn check_interval(&mut self) -> bool {
         let cur = current_time();
         if cur
@@ -724,6 +734,19 @@ impl Display for AflFuzzerStats<'_> {
         Ok(())
     }
 }
+#[expect(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+#[expect(clippy::cast_sign_loss)]
+fn calculate_execs_per_sec(prev: Option<(Duration, u64)>, now: Duration, execs: u64) -> u64 {
+    let Some((prev_time, prev_execs)) = prev else {
+        return 0;
+    };
+    let elapsed = now.saturating_sub(prev_time).as_secs_f64();
+    if elapsed <= 0.0 {
+        return 0;
+    }
+    (execs.saturating_sub(prev_execs) as f64 / elapsed) as u64
+}
+
 /// Get the command used to invoke the fuzzer
 #[must_use]
 pub fn get_run_cmdline() -> Cow<'static, str> {
@@ -888,6 +911,7 @@ where
             map_observer_handle: self.map_observer_handle.unwrap(),
             start_time: current_time().as_secs(),
             stats_report_interval: self.report_interval,
+            last_execs_sample: None,
             has_fuzzed_size: 0,
             is_favored_size: 0,
             cycles_done: 0,
@@ -912,5 +936,36 @@ where
             autotokens_enabled: self.uses_autotokens,
             phantom: PhantomData,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use core::time::Duration;
+
+    use super::calculate_execs_per_sec;
+
+    #[test]
+    fn execs_per_sec_is_a_rate_not_a_total() {
+        // no previous sample yet
+        assert_eq!(
+            calculate_execs_per_sec(None, Duration::from_secs(60), 5_000_000),
+            0
+        );
+        // 5_000_000 total execs, but only 600 new ones in the last 60s => 10/s
+        let prev = Some((Duration::from_secs(60), 4_999_400));
+        assert_eq!(
+            calculate_execs_per_sec(prev, Duration::from_secs(120), 5_000_000),
+            10
+        );
+        // no elapsed time or a counter that went backwards must not panic or underflow
+        assert_eq!(
+            calculate_execs_per_sec(prev, Duration::from_secs(60), 5_000_000),
+            0
+        );
+        assert_eq!(
+            calculate_execs_per_sec(prev, Duration::from_secs(120), 10),
+            0
+        );
     }
 }
