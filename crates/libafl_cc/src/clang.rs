@@ -127,7 +127,17 @@ impl ToolWrapper for ClangWrapper {
             ));
         }
 
-        self.name = args[0].as_ref().to_string();
+        // Expand any `@file` response-file arguments up front so the
+        // per-`Configuration` filename rewriting below sees the real
+        // arguments instead of an opaque `@file` token. The wrapper's own
+        // name (args[0]) is passed through untouched.
+        let expanded_tail = crate::response_file::expand_response_files(&args[1..])?;
+        let mut expanded: Vec<String> = Vec::with_capacity(1 + expanded_tail.len());
+        expanded.push(args[0].as_ref().to_string());
+        expanded.extend(expanded_tail);
+        let args = expanded;
+
+        self.name.clone_from(&args[0]);
         // Detect C++ compiler looking at the wrapper name
         self.is_cpp = if cfg!(windows) {
             self.is_cpp || self.name.ends_with("++.exe")
@@ -141,9 +151,9 @@ impl ToolWrapper for ClangWrapper {
         let mut linking = true;
         let mut shared = false;
         // Detect stray -v calls from ./configure scripts.
-        if args.len() > 1 && args[1].as_ref() == "-v" {
+        if args.len() > 1 && args[1].as_str() == "-v" {
             if args.len() == 2 {
-                self.base_args.push(args[1].as_ref().into());
+                self.base_args.push(args[1].clone());
                 return Ok(self);
             }
             linking = false;
@@ -152,7 +162,7 @@ impl ToolWrapper for ClangWrapper {
         let mut suppress_linking = 0;
         let mut i = 1;
         while i < args.len() {
-            let arg_as_path = Path::new(args[i].as_ref());
+            let arg_as_path = Path::new(args[i].as_str());
 
             if arg_as_path
                 .extension()
@@ -192,8 +202,8 @@ impl ToolWrapper for ClangWrapper {
                 }
                 "-z" | "-Wl,-z"
                     if i + 1 < args.len()
-                        && (args[i + 1].as_ref() == "defs"
-                            || args[i + 1].as_ref() == "-Wl,defs") =>
+                        && (args[i + 1].as_str() == "defs"
+                            || args[i + 1].as_str() == "-Wl,defs") =>
                 {
                     i += 2;
                     continue;
@@ -206,7 +216,6 @@ impl ToolWrapper for ClangWrapper {
                 "--libafl-configurations" if i + 1 < args.len() => {
                     self.configurations.extend(
                         args[i + 1]
-                            .as_ref()
                             .split(',')
                             .map(|x| crate::Configuration::from_str(x).unwrap()),
                     );
@@ -214,7 +223,7 @@ impl ToolWrapper for ClangWrapper {
                     continue;
                 }
                 "-o" if i + 1 < args.len() => {
-                    self.output = Some(PathBuf::from(args[i + 1].as_ref()));
+                    self.output = Some(PathBuf::from(args[i + 1].as_str()));
                     i += 2;
                     continue;
                 }
@@ -228,7 +237,7 @@ impl ToolWrapper for ClangWrapper {
                 } // TODO dynamic list?
                 _ => (),
             }
-            new_args.push(args[i].as_ref().to_string());
+            new_args.push(args[i].clone());
             i += 1;
         }
         if linking
