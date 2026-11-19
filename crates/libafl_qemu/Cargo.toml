@@ -99,6 +99,10 @@ slirp = [
   "systemmode",
   "libafl_qemu_sys/slirp",
 ] # build qemu with host libslirp (for user networking)
+virtfs = [
+  "systemmode",
+  "libafl_qemu_sys/virtfs",
+] # build qemu with virtfs support (for host directory sharing)
 
 intel_pt = ["systemmode", "x86_64", "dep:libafl_intelpt"]
 intel_pt_export_raw = ["intel_pt", "libafl_intelpt/export_raw"]

@@ -26,6 +26,7 @@ all-features = true
 [features]
 shared = []
 slirp = []  # build qemu with host libslirp (for user networking)
+virtfs = [] # build qemu with virtfs support (for host directory sharing)
 
 clippy = [] # special feature for clippy, don't use in normal projects§
 
