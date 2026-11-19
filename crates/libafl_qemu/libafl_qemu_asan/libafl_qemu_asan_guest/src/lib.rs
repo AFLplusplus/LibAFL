@@ -105,7 +105,13 @@ pub unsafe extern "C" fn asan_store(addr: *const c_void, size: usize) {
 /// # Safety
 pub unsafe extern "C" fn asan_alloc(len: usize, align: usize) -> *mut c_void {
     trace!("alloc - len: {:#x}, align: {:#x}", len, align);
-    let ptr = FRONTEND.lock().alloc(len, align).unwrap() as *mut c_void;
+    let ptr = match FRONTEND.lock().alloc(len, align) {
+        Ok(ptr) => ptr as *mut c_void,
+        Err(e) => {
+            info!("asan_alloc failed: len={len:#x}, align={align:#x}, err={e:?}");
+            return core::ptr::null_mut();
+        }
+    };
     trace!(
         "alloc - len: {:#x}, align: {:#x}, ptr: {:p}",
         len, align, ptr
