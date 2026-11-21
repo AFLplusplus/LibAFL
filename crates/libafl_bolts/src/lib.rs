@@ -142,8 +142,6 @@ use core::hash::BuildHasher;
 #[cfg(any(feature = "xxh3", feature = "alloc"))]
 use core::hash::{Hash, Hasher};
 #[cfg(all(unix, feature = "std"))]
-use core::mem;
-#[cfg(all(unix, feature = "std"))]
 use std::{
     fs::File,
     io::Write,
@@ -275,7 +273,7 @@ pub static LIBAFL_STDOUT_LOGGER: SimpleStdoutLogger = SimpleStdoutLogger::new();
 
 /// A logger we can use log to raw fds.
 #[cfg(all(unix, feature = "std"))]
-static mut LIBAFL_RAWFD_LOGGER: SimpleFdLogger = unsafe { SimpleFdLogger::new(1) };
+static LIBAFL_RAWFD_LOGGER: SimpleFdLogger = unsafe { SimpleFdLogger::new(1) };
 
 /// A simple logger struct that logs to stdout when used with [`log::set_logger`].
 #[derive(Debug)]
@@ -310,11 +308,10 @@ impl SimpleStdoutLogger {
 #[must_use]
 /// Return thread ID without using TLS
 pub fn get_thread_id() -> u64 {
-    use core::arch::asm;
     #[cfg(target_arch = "x86_64")]
     unsafe {
         let teb: *const u8;
-        asm!("mov {}, gs:[0x30]", out(reg) teb);
+        core::arch::asm!("mov {}, gs:[0x30]", out(reg) teb);
         let thread_id_ptr = teb.add(0x48) as *const u32;
         u64::from(*thread_id_ptr)
     }
@@ -322,13 +319,18 @@ pub fn get_thread_id() -> u64 {
     #[cfg(target_arch = "x86")]
     unsafe {
         let teb: *const u8;
-        asm!("mov {}, fs:[0x18]", out(reg) teb);
+        core::arch::asm!("mov {}, fs:[0x18]", out(reg) teb);
         let thread_id_ptr = teb.add(0x24) as *const u32;
         *thread_id_ptr as u64
     }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
+    unsafe {
+        u64::from(winapi::um::processthreadsapi::GetCurrentThreadId())
+    }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[must_use]
 #[allow(clippy::cast_sign_loss)]
 /// Return thread ID without using TLS
@@ -338,14 +340,35 @@ pub fn get_thread_id() -> u64 {
     unsafe { syscall(SYS_gettid) as u64 }
 }
 
-#[cfg(feature = "std")]
-#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+#[cfg(target_vendor = "apple")]
 #[must_use]
-/// Return thread ID using Rust's `std::thread`
+/// Return thread ID without using TLS
 pub fn get_thread_id() -> u64 {
-    // Fallback for other platforms
-    let thread_id = std::thread::current().id();
-    unsafe { mem::transmute::<_, u64>(thread_id) }
+    let mut tid = 0u64;
+    // SAFETY: Passing thread = 0 queries the calling thread's kernel ID into `tid` without TLS.
+    unsafe {
+        libc::pthread_threadid_np(0, &raw mut tid);
+    }
+    tid
+}
+
+#[cfg(feature = "std")]
+#[cfg(not(any(
+    target_os = "windows",
+    target_os = "linux",
+    target_os = "android",
+    target_vendor = "apple"
+)))]
+#[must_use]
+/// Return thread ID using a thread-local monotonic counter.
+pub fn get_thread_id() -> u64 {
+    use core::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT_THREAD_ID: AtomicU64 = AtomicU64::new(1);
+    std::thread_local! {
+        static THREAD_ID: u64 = NEXT_THREAD_ID.fetch_add(1, Ordering::Relaxed);
+    }
+    THREAD_ID.try_with(|id| *id).unwrap_or(0)
 }
 
 #[cfg(feature = "std")]
@@ -494,7 +517,7 @@ impl log::Log for SimpleStderrLogger {
 #[derive(Debug)]
 #[cfg(all(feature = "std", unix))]
 pub struct SimpleFdLogger {
-    fd: RawFd,
+    fd: core::sync::atomic::AtomicI32,
 }
 
 #[cfg(all(feature = "std", unix))]
@@ -502,36 +525,39 @@ impl SimpleFdLogger {
     /// Create a new [`log::Log`] logger that will write the log to the given `fd`
     ///
     /// # Safety
-    /// Needs a valid raw file descriptor opened for writing.
+    /// `fd` must remain a valid open file descriptor writable for as long as this logger is used.
     #[must_use]
     pub const unsafe fn new(fd: RawFd) -> Self {
-        Self { fd }
+        Self {
+            fd: core::sync::atomic::AtomicI32::new(fd),
+        }
     }
 
     /// Sets the `fd` this logger will write to
     ///
     /// # Safety
-    /// Needs a valid raw file descriptor opened for writing.
-    pub unsafe fn set_fd(&mut self, fd: RawFd) {
-        self.fd = fd;
+    /// `fd` must remain a valid open file descriptor writable for as long as this logger is used.
+    pub unsafe fn set_fd(&self, fd: RawFd) {
+        self.fd.store(fd, core::sync::atomic::Ordering::Relaxed);
     }
 
     /// Register this logger, logging to the given `fd`
     ///
     /// # Safety
-    /// This function may not be called multiple times concurrently.
-    /// The passed-in `fd` has to be a legal file descriptor to log to.
+    /// `log_fd` must remain a valid open file descriptor writable for the remainder of the process.
     pub unsafe fn set_logger(log_fd: RawFd) -> Result<(), Error> {
-        // # Safety
-        // The passed-in `fd` has to be a legal file descriptor to log to.
-        // We also access a shared variable here.
-        let logger = &raw mut LIBAFL_RAWFD_LOGGER;
-        unsafe {
-            let logger = &mut *logger;
-            logger.set_fd(log_fd);
-            log::set_logger(logger)
-                .map_err(|err| Error::illegal_state(format!("Could not set logger: {err:?}")))
+        if log_fd < 0 {
+            return Err(Error::illegal_argument("log_fd must be non-negative"));
         }
+        let prev = LIBAFL_RAWFD_LOGGER
+            .fd
+            .swap(log_fd, core::sync::atomic::Ordering::Relaxed);
+        log::set_logger(&LIBAFL_RAWFD_LOGGER).map_err(|err| {
+            LIBAFL_RAWFD_LOGGER
+                .fd
+                .store(prev, core::sync::atomic::Ordering::Relaxed);
+            Error::illegal_state(format!("Could not set logger: {err:?}"))
+        })
     }
 }
 
@@ -543,7 +569,11 @@ impl log::Log for SimpleFdLogger {
     }
 
     fn log(&self, record: &Record) {
-        let mut f = unsafe { File::from_raw_fd(self.fd) };
+        let fd = self.fd.load(core::sync::atomic::Ordering::Relaxed);
+        if fd < 0 {
+            return;
+        }
+        let mut f = core::mem::ManuallyDrop::new(unsafe { File::from_raw_fd(fd) });
         writeln!(
             f,
             "[{:?}, {:#?}] {}: {}",
@@ -552,31 +582,29 @@ impl log::Log for SimpleFdLogger {
             record.level(),
             record.args()
         )
-        .unwrap_or_else(|err| println!("Failed to log to fd {}: {err}", self.fd));
-        mem::forget(f);
+        .unwrap_or_else(|err| println!("Failed to log to fd {fd}: {err}"));
     }
 
     fn flush(&self) {}
 }
 
-/// Set up an error print hook that will
+/// Set up an error print hook that will write panic diagnostics to `new_stderr`.
 ///
 /// # Safety
-/// Will fail if `new_stderr` is not a valid file descriptor.
-/// May not be called multiple times concurrently.
+/// `new_stderr` must remain a valid open file descriptor writable whenever the panic hook may fire.
 #[cfg(all(unix, feature = "std"))]
 pub unsafe fn set_error_print_panic_hook(new_stderr: RawFd) {
-    // Make sure potential errors get printed to the correct (non-closed) stderr
+    if new_stderr < 0 {
+        return;
+    }
     panic::set_hook(Box::new(move |panic_info| {
-        let mut f = unsafe { File::from_raw_fd(new_stderr) };
+        let mut f = core::mem::ManuallyDrop::new(unsafe { File::from_raw_fd(new_stderr) });
         writeln!(f, "{panic_info}")
             .unwrap_or_else(|err| println!("Failed to log to fd {new_stderr}: {err}"));
-        mem::forget(f);
     }));
 }
 
-#[cfg(feature = "std")]
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "std", target_os = "windows", target_arch = "x86_64"))]
 #[repr(C)]
 #[allow(clippy::upper_case_acronyms)]
 struct TEB {
@@ -606,7 +634,7 @@ fn nt_current_teb() -> *mut TEB {
 #[allow(unreachable_code)]
 #[must_use]
 pub fn has_tls() -> bool {
-    #[cfg(target_os = "windows")]
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
     unsafe {
         let teb = nt_current_teb();
         if teb.is_null() {
@@ -619,15 +647,18 @@ pub fn has_tls() -> bool {
         }
         return true;
     }
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(target_arch = "aarch64", target_vendor = "apple"))]
     unsafe {
         let mut tid: u64;
-        std::arch::asm!(
+        core::arch::asm!(
             "mrs {tid}, TPIDRRO_EL0",
             tid = out(reg) tid,
         );
         tid &= 0xffff_ffff_ffff_fff8;
         let tlsptr = tid as *const u64;
+        if tlsptr.is_null() {
+            return false;
+        }
         return tlsptr.add(0x102).read() != 0u64;
     }
     // Default
@@ -756,15 +787,40 @@ mod tests {
     #[test]
     #[cfg(all(unix, feature = "std"))]
     fn test_logger() {
-        use std::{io::stdout, os::fd::AsRawFd};
+        use core::sync::atomic::Ordering;
+        use std::{
+            io::{stderr, stdout},
+            os::fd::AsRawFd,
+        };
 
-        unsafe { LIBAFL_RAWFD_LOGGER.fd = stdout().as_raw_fd() };
+        use crate::SimpleFdLogger;
 
-        let libafl_rawfd_logger_fd = &raw const LIBAFL_RAWFD_LOGGER;
-        unsafe {
-            log::set_logger(&*libafl_rawfd_logger_fd).unwrap();
-        }
+        let out_fd = stdout().as_raw_fd();
+        assert!(unsafe { SimpleFdLogger::set_logger(-1) }.is_err());
+        unsafe { SimpleFdLogger::set_logger(out_fd) }.unwrap();
+        assert!(unsafe { SimpleFdLogger::set_logger(stderr().as_raw_fd()) }.is_err());
+        assert_eq!(LIBAFL_RAWFD_LOGGER.fd.load(Ordering::Relaxed), out_fd);
         log::set_max_level(log::LevelFilter::Debug);
         log::info!("Test");
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    #[cfg_attr(miri, ignore)]
+    fn test_get_thread_id() {
+        use crate::{get_thread_id, has_tls};
+
+        let tls = has_tls();
+        #[cfg(not(all(target_arch = "aarch64", target_vendor = "apple")))]
+        assert!(tls);
+        #[cfg(all(target_arch = "aarch64", target_vendor = "apple"))]
+        core::hint::black_box(tls);
+        let main_id = get_thread_id();
+        assert_ne!(main_id, 0);
+        assert_eq!(main_id, get_thread_id());
+
+        let child_id = std::thread::spawn(get_thread_id).join().unwrap();
+        assert_ne!(child_id, 0);
+        assert_ne!(child_id, main_id);
     }
 }

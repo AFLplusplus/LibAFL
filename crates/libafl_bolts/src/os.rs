@@ -1,9 +1,7 @@
 //! Operating System specific abstractions
 
 #[cfg(all(unix, feature = "std"))]
-use alloc::{borrow::Cow, ffi::CString};
-#[cfg(all(unix, feature = "std"))]
-use core::ffi::CStr;
+use alloc::{borrow::Cow, ffi::CString, string::ToString};
 #[cfg(all(unix, feature = "std"))]
 use std::io::{stderr, stdout};
 #[cfg(feature = "std")]
@@ -71,28 +69,24 @@ pub fn last_os_error() -> i32 {
 pub fn waitpid_with_signals(pid: i32) -> i32 {
     unsafe {
         let mut status = 0;
-        loop {
-            let res = libc::waitpid(pid, &raw mut status, 0);
-            if res < 0 {
-                #[cfg(feature = "std")]
-                {
-                    let err = std::io::Error::last_os_error();
-                    #[allow(clippy::std_instead_of_core)]
-                    if err.kind() == std::io::ErrorKind::Interrupted {
-                        continue;
-                    }
-                }
+        #[cfg(feature = "std")]
+        while libc::waitpid(pid, &raw mut status, 0) < 0 {
+            if last_os_error() != libc::EINTR {
                 return 0;
             }
-            if libc::WIFSIGNALED(status) {
-                let sig = libc::WTERMSIG(status);
-                if sig == libc::SIGINT || sig == libc::SIGTERM {
-                    return CTRL_C_EXIT;
-                }
-                return 128 + sig;
-            }
-            return libc::WEXITSTATUS(status);
         }
+        #[cfg(not(feature = "std"))]
+        if libc::waitpid(pid, &raw mut status, 0) < 0 {
+            return 0;
+        }
+        if libc::WIFSIGNALED(status) {
+            let sig = libc::WTERMSIG(status);
+            if sig == libc::SIGINT || sig == libc::SIGTERM {
+                return CTRL_C_EXIT;
+            }
+            return 128 + sig;
+        }
+        libc::WEXITSTATUS(status)
     }
 }
 
@@ -219,16 +213,11 @@ pub unsafe fn dup_and_mute_outputs() -> Result<(RawFd, RawFd), Error> {
 }
 
 /// Gets the stringified version of the last `errno`.
-/// This is roughly equivalent to `strerror(errno)` in C.
 #[cfg(all(unix, feature = "std"))]
 #[must_use]
 pub fn last_error_str<'a>() -> Option<Cow<'a, str>> {
-    std::io::Error::last_os_error().raw_os_error().map(|errno| {
-        // # Safety
-        //
-        // Calling the `strerror` libc functions with the correct `errno`
-        unsafe { CStr::from_ptr(libc::strerror(errno)).to_string_lossy() }
-    })
+    let err = std::io::Error::last_os_error();
+    err.raw_os_error().map(|_| Cow::Owned(err.to_string()))
 }
 
 /// Get a file descriptor ([`RawFd`]) pointing to "/dev/null"
@@ -272,5 +261,24 @@ pub fn exit(code: i32) -> ! {
         std::process::exit(code);
         #[cfg(not(feature = "std"))]
         panic!("exit called with {code} on unsupported no_std platform");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    #[cfg(unix)]
+    #[cfg_attr(miri, ignore)]
+    fn test_waitpid_with_signals_echild_returns_zero() {
+        assert_eq!(super::waitpid_with_signals(-1), 0);
+    }
+
+    #[test]
+    #[cfg(all(unix, feature = "std"))]
+    #[cfg_attr(miri, ignore)]
+    fn test_last_error_str_returns_owned_non_empty() {
+        assert!(std::fs::File::open("/nonexistent_libafl_bolts_test_path_9f8e7d").is_err());
+        let s1 = super::last_error_str().expect("errno should be populated");
+        assert!(!s1.is_empty());
     }
 }

@@ -252,12 +252,10 @@ impl VectorType for wide::u8x16 {
     }
 
     fn novelties(hist: &[u8], map: &[u8], base: usize, novelties: &mut Vec<usize>) {
-        unsafe {
-            for j in base..(base + Self::N) {
-                let item = *map.get_unchecked(j);
-                if item > *hist.get_unchecked(j) {
-                    novelties.push(j);
-                }
+        let (hist, map) = (&hist[base..][..Self::N], &map[base..][..Self::N]);
+        for offset in 0..Self::N {
+            if map[offset] > hist[offset] {
+                novelties.push(base + offset);
             }
         }
     }
@@ -292,21 +290,12 @@ impl VectorType for wide::u8x32 {
     }
 
     fn novelties(hist: &[u8], map: &[u8], base: usize, novelties: &mut Vec<usize>) {
-        unsafe {
-            // Break into two loops so that LLVM will vectorize both loops.
-            // Or LLVM won't vectorize them and is super slow. We need a few
-            // extra intrinsic to wide and safe_arch to vectorize this manually.
-            for j in base..(base + Self::N / 2) {
-                let item = *map.get_unchecked(j);
-                if item > *hist.get_unchecked(j) {
-                    novelties.push(j);
-                }
-            }
-
-            for j in (base + Self::N / 2)..(base + Self::N) {
-                let item = *map.get_unchecked(j);
-                if item > *hist.get_unchecked(j) {
-                    novelties.push(j);
+        let (hist, map) = (&hist[base..][..Self::N], &map[base..][..Self::N]);
+        // Split into two 16-byte loops so LLVM vectorizes both.
+        for range in [0..Self::N / 2, Self::N / 2..Self::N] {
+            for offset in range {
+                if map[offset] > hist[offset] {
+                    novelties.push(base + offset);
                 }
             }
         }
@@ -513,5 +502,33 @@ mod tests {
         std_simplify_map(&mut map_simd);
 
         assert_eq!(map_naive, map_simd);
+    }
+
+    #[test]
+    #[cfg(feature = "wide")]
+    #[should_panic(expected = "out of range")]
+    fn test_novelties_bounds_checked() {
+        let mut out = Vec::new();
+        <wide::u8x16 as VectorType>::novelties(&[], &[], 0, &mut out);
+    }
+
+    #[test]
+    #[cfg(feature = "wide")]
+    #[should_panic(expected = "out of range")]
+    fn test_novelties_u8x32_overflow_checked() {
+        let mut out = Vec::new();
+        <wide::u8x32 as VectorType>::novelties(&[0u8; 32], &[0u8; 32], usize::MAX, &mut out);
+    }
+
+    #[test]
+    #[cfg(feature = "wide")]
+    fn test_novelties_u8x32_both_halves() {
+        let hist = [1u8; 32];
+        let mut map = [1u8; 32];
+        map[3] = 2;
+        map[27] = 9;
+        let mut out = Vec::new();
+        <wide::u8x32 as VectorType>::novelties(&hist, &map, 0, &mut out);
+        assert_eq!(out, vec![3, 27]);
     }
 }
