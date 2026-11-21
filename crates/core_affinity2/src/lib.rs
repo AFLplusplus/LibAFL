@@ -1151,29 +1151,37 @@ mod tests {
     #[cfg_attr(any(miri, target_os = "freebsd"), ignore)]
     fn test_get_core_ids() {
         let set = get_core_ids().unwrap();
-        assert_eq!(set.len(), usize::from(available_parallelism().unwrap()));
+        // `available_parallelism()` may be further capped below the affinity mask by cgroup
+        // `cpu.max` bandwidth quotas in containerized environments.
+        assert!(set.len() >= usize::from(available_parallelism().unwrap()));
     }
 
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_set_affinity() {
-        let ids = get_core_ids().unwrap();
-
-        assert_ne!(ids.len(), 0);
-
-        ids[0].set_affinity().unwrap();
+        std::thread::spawn(|| {
+            let ids = get_core_ids().unwrap();
+            assert_ne!(ids.len(), 0);
+            ids[0].set_affinity().unwrap();
+        })
+        .join()
+        .unwrap();
     }
 
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_set_get_affinity() {
-        let ids = get_core_ids().unwrap();
-        assert_ne!(ids.len(), 0);
+        std::thread::spawn(|| {
+            let ids = get_core_ids().unwrap();
+            assert_ne!(ids.len(), 0);
 
-        ids[0].set_affinity().expect("Failed to set affinity");
-        let affinity = get_affinity()
-            .expect("Failed to get affinity")
-            .expect("Affinity should be set");
-        assert_eq!(affinity, ids[0]);
+            ids[0].set_affinity().expect("Failed to set affinity");
+            let affinity = get_affinity()
+                .expect("Failed to get affinity")
+                .expect("Affinity should be set");
+            assert_eq!(affinity, ids[0]);
+        })
+        .join()
+        .unwrap();
     }
 }
