@@ -186,6 +186,7 @@ pub trait Rand {
     }
 
     /// Gets a value below the given one or zero
+    #[inline]
     fn below_or_zero(&mut self, n: usize) -> usize {
         fast_bound_usize(self.next(), n)
     }
@@ -199,11 +200,13 @@ pub trait Rand {
             return self.next() as usize;
         }
 
-        // # Safety
-        // We check that the upper_bound_incl <= lower_bound_incl above (alas only in debug), so the below is fine.
-        // Even if we encounter a 0 in release here, the worst-case scenario should be an invalid return value.
-        lower_bound_incl
-            + self.below(unsafe { NonZero::new_unchecked(upper_bound_incl - lower_bound_incl + 1) })
+        lower_bound_incl.wrapping_add(
+            self.below_or_zero(
+                upper_bound_incl
+                    .wrapping_sub(lower_bound_incl)
+                    .wrapping_add(1),
+            ),
+        )
     }
 
     /// Convenient variant of [`choose`].
@@ -238,11 +241,12 @@ pub trait Rand {
         // Continue until the iterator is exhausted
         loop {
             if lower > 1 {
-                // # Safety
-                // lower is > 1, we don't consume more than usize elements, so this should always be non-0.
-                let ix = self.below(unsafe { NonZero::new_unchecked(lower + consumed) });
+                let ix = self.below_or_zero(lower.saturating_add(consumed));
                 let skip = if ix < lower {
-                    result = iter.nth(ix);
+                    match iter.nth(ix) {
+                        Some(elem) => result = Some(elem),
+                        None => return result,
+                    }
                     lower - (ix + 1)
                 } else {
                     lower
@@ -250,19 +254,17 @@ pub trait Rand {
                 if upper == Some(lower) {
                     return result;
                 }
-                consumed += lower;
-                if skip > 0 {
-                    iter.nth(skip - 1);
+                consumed = consumed.saturating_add(lower);
+                if skip > 0 && iter.nth(skip - 1).is_none() {
+                    return result;
                 }
             } else {
                 let elem = iter.next();
                 if elem.is_none() {
                     return result;
                 }
-                consumed += 1;
-                // # SAFETY
-                // `consumed` can never be 0 here. We just increased it by 1 above.
-                if self.below(unsafe { NonZero::new_unchecked(consumed) }) == 0 {
+                consumed = consumed.saturating_add(1);
+                if self.below_or_zero(consumed) == 0 {
                     result = elem;
                 }
             }
@@ -928,5 +930,56 @@ mod tests {
         assert_ne!(sub_a.next(), sub_c.next());
         sub_b.next();
         assert_eq!(sub_a.next(), sub_b.next());
+    }
+
+    #[test]
+    fn test_between_bounds() {
+        let mut rng = StdRand::with_seed(42);
+        assert_eq!(rng.between(7, 7), 7);
+        assert_eq!(rng.between(usize::MAX, usize::MAX), usize::MAX);
+        for _ in 0..100 {
+            assert!((10..=20).contains(&rng.between(10, 20)));
+        }
+        core::hint::black_box(rng.between(0, usize::MAX));
+        #[cfg(not(debug_assertions))]
+        {
+            assert_eq!(rng.between(10, 9), 10);
+            core::hint::black_box(rng.between(20, 9));
+        }
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "lower_bound_incl <= upper_bound_incl")]
+    fn test_between_invalid_bounds_panics() {
+        let _val = StdRand::with_seed(42).between(10, 9);
+    }
+
+    #[test]
+    fn test_choose_bogus_size_hint() {
+        struct BogusHintIter {
+            items: [u32; 2],
+            idx: usize,
+        }
+        impl Iterator for BogusHintIter {
+            type Item = u32;
+            fn next(&mut self) -> Option<u32> {
+                let item = *self.items.get(self.idx)?;
+                self.idx += 1;
+                Some(item)
+            }
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                (if self.idx < 2 { 2 } else { usize::MAX - 1 }, None)
+            }
+        }
+
+        let mut rng = StdRand::with_seed(42);
+        let chosen = rng.choose(BogusHintIter {
+            items: [10, 20],
+            idx: 0,
+        });
+        assert!(matches!(chosen, Some(10 | 20)));
+        assert_eq!(rng.choose([77u32]), Some(77));
+        assert_eq!(rng.choose(core::iter::empty::<u32>()), None);
     }
 }

@@ -77,10 +77,8 @@ impl LoadedDiceSampler {
     /// Get one sample according to the predefined probabilities.
     pub fn sample<R: Rand>(&mut self, rand: &mut R) -> usize {
         let len = self.entries.len();
-        debug_assert_ne!(len, 0, "Lenght should never be 0 here.");
-        // # SAFETY
-        // len can never be 0 here.
-        let index = rand.below(unsafe { len.try_into().unwrap_unchecked() });
+        debug_assert_ne!(len, 0, "Length should never be 0 here.");
+        let index = rand.below_or_zero(len);
         let coin = rand.next_float();
         let entry = &self.entries[index];
         if coin > entry.prob_of_val {
