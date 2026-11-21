@@ -89,7 +89,7 @@ impl CmpLogObserver {
             name: Cow::from(name),
             size: None,
             add_meta,
-            map: OwnedMutPtr::Ptr(map),
+            map: unsafe { OwnedMutPtr::from_raw_mut(map) },
         }
     }
 

@@ -68,7 +68,6 @@ mod arrays {
     use alloc::{boxed::Box, fmt, vec::Vec};
     use core::{convert::TryInto, marker::PhantomData};
 
-    use libafl_core::format;
     use serde::{
         Deserialize, Deserializer,
         de::{SeqAccess, Visitor},
@@ -83,7 +82,7 @@ mod arrays {
         type Value = Box<[T; N]>;
 
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str(&format!("an array of length {N}"))
+            write!(formatter, "an array of length {N}")
         }
 
         #[inline]
@@ -195,7 +194,7 @@ where
     /// Returns true if the inner ref is a raw pointer, false otherwise.
     #[must_use]
     pub fn is_raw(&self) -> bool {
-        matches!(self, OwnedRef::Ref(_))
+        matches!(self, OwnedRef::RefRaw(..))
     }
 
     /// Return the inner value, if owned by the given object
@@ -470,11 +469,12 @@ impl<'a, T> OwnedSlice<'a, T> {
     /// The contents will be dereferenced in subsequent operations.
     #[must_use]
     pub unsafe fn from_raw_parts(ptr: *const T, len: usize) -> Self {
-        unsafe {
-            Self {
-                inner: OwnedSliceInner::RefRaw(ptr, len, UnsafeMarker::new()),
-            }
-        }
+        let inner = if ptr.is_null() || len == 0 {
+            OwnedSliceInner::Ref(&[])
+        } else {
+            OwnedSliceInner::RefRaw(ptr, len, unsafe { UnsafeMarker::new() })
+        };
+        Self { inner }
     }
 
     /// Truncate the inner slice or vec returning the old size on success or `None` on failure
@@ -650,7 +650,7 @@ impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedMutSliceInner<'a, T> {
     {
         match self {
             OwnedMutSliceInner::RefRaw(rr, len, _) => {
-                unsafe { slice::from_raw_parts_mut(*rr, *len) }.serialize(se)
+                unsafe { slice::from_raw_parts(*rr, *len) }.serialize(se)
             }
             OwnedMutSliceInner::Ref(r) => r.serialize(se),
             OwnedMutSliceInner::Owned(b) => b.serialize(se),
@@ -704,17 +704,12 @@ impl<'a, T: 'a + Sized> OwnedMutSlice<'a, T> {
     /// The contents will be dereferenced in subsequent operations.
     #[must_use]
     pub unsafe fn from_raw_parts_mut(ptr: *mut T, len: usize) -> OwnedMutSlice<'a, T> {
-        unsafe {
-            if ptr.is_null() || len == 0 {
-                Self {
-                    inner: OwnedMutSliceInner::Owned(Vec::new()),
-                }
-            } else {
-                Self {
-                    inner: OwnedMutSliceInner::RefRaw(ptr, len, UnsafeMarker::new()),
-                }
-            }
-        }
+        let inner = if ptr.is_null() || len == 0 {
+            OwnedMutSliceInner::Ref(&mut [])
+        } else {
+            OwnedMutSliceInner::RefRaw(ptr, len, unsafe { UnsafeMarker::new() })
+        };
+        Self { inner }
     }
 
     /// Truncate the inner slice or vec returning the old size on success or `None` on failure
@@ -799,7 +794,7 @@ where
     fn into_owned(self) -> Self {
         let vec = match self.inner {
             OwnedMutSliceInner::RefRaw(rr, len, _) => unsafe {
-                slice::from_raw_parts_mut(rr, len).to_vec()
+                slice::from_raw_parts(rr, len).to_vec()
             },
             OwnedMutSliceInner::Ref(r) => r.to_vec(),
             OwnedMutSliceInner::Owned(v) => v,
@@ -1078,7 +1073,7 @@ impl<'a, T, const N: usize> From<&'a mut &'a mut [T; N]> for OwnedMutSizedSlice<
 #[derive(Debug, Clone)]
 pub enum OwnedPtr<T: Sized> {
     /// Ptr to the content
-    Ptr(*const T),
+    Ptr(*const T, UnsafeMarker),
     /// Ptr to an owned [`Box`] of the content.
     Owned(Box<T>),
 }
@@ -1087,10 +1082,10 @@ impl<T: Sized> OwnedPtr<T> {
     /// Creates a new [`OwnedPtr`] from a raw pointer
     ///
     /// # Safety
-    /// The raw pointer will later be dereferenced.
-    /// It must outlive this `OwnedPtr` type and remain valid.
+    /// Whenever this [`OwnedPtr`] is dereferenced (via [`AsRef`], [`Serialize`], or [`IntoOwned`]),
+    /// `ptr` must be non-null, aligned, and point to a valid `T`.
     pub unsafe fn from_raw(ptr: *const T) -> Self {
-        Self::Ptr(ptr)
+        Self::Ptr(ptr, unsafe { UnsafeMarker::new() })
     }
 }
 
@@ -1118,7 +1113,7 @@ where
 impl<T: Sized> AsRef<T> for OwnedPtr<T> {
     fn as_ref(&self) -> &T {
         match self {
-            OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap() },
+            OwnedPtr::Ptr(p, _) => unsafe { p.as_ref().unwrap() },
             OwnedPtr::Owned(v) => v.as_ref(),
         }
     }
@@ -1130,43 +1125,50 @@ where
 {
     fn is_owned(&self) -> bool {
         match self {
-            OwnedPtr::Ptr(_) => false,
+            OwnedPtr::Ptr(_, _) => false,
             OwnedPtr::Owned(_) => true,
         }
     }
 
     fn into_owned(self) -> Self {
         match self {
-            OwnedPtr::Ptr(p) => unsafe { OwnedPtr::Owned(Box::new(p.as_ref().unwrap().clone())) },
+            OwnedPtr::Ptr(..) => OwnedPtr::Owned(Box::new(self.as_ref().clone())),
             OwnedPtr::Owned(v) => OwnedPtr::Owned(v),
         }
     }
 }
 
 /// Wrap a C-style mutable pointer and convert to a Box on serialize
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum OwnedMutPtr<T: Sized> {
     /// A mut ptr to the content
-    Ptr(*mut T),
+    Ptr(*mut T, UnsafeMarker),
     /// An owned [`Box`] to the content
     Owned(Box<T>),
+}
+
+impl<T: Sized + Clone> Clone for OwnedMutPtr<T> {
+    fn clone(&self) -> Self {
+        Self::Owned(Box::new(self.as_ref().clone()))
+    }
 }
 
 impl<T: Sized> OwnedMutPtr<T> {
     /// Creates a new [`OwnedMutPtr`] from a raw pointer
     ///
     /// # Safety
-    /// The raw pointer will later be dereferenced.
-    /// It must outlive this `OwnedPtr` type and remain valid.
+    /// Whenever this [`OwnedMutPtr`] is dereferenced (via [`AsRef`], [`AsMut`], [`Clone`],
+    /// [`Serialize`], or [`IntoOwned`]), `ptr` must be non-null, aligned, and point to a valid,
+    /// uniquely accessible `T`.
     pub unsafe fn from_raw_mut(ptr: *mut T) -> Self {
-        Self::Ptr(ptr)
+        Self::Ptr(ptr, unsafe { UnsafeMarker::new() })
     }
 
     /// Get a pointer to the inner object
     #[must_use]
     pub fn as_ptr(&self) -> *const T {
         match self {
-            OwnedMutPtr::Ptr(ptr) => *ptr,
+            OwnedMutPtr::Ptr(ptr, _) => *ptr,
             OwnedMutPtr::Owned(owned) => &raw const **owned,
         }
     }
@@ -1175,7 +1177,7 @@ impl<T: Sized> OwnedMutPtr<T> {
     #[must_use]
     pub fn as_mut_ptr(&mut self) -> *mut T {
         match self {
-            OwnedMutPtr::Ptr(ptr) => *ptr,
+            OwnedMutPtr::Ptr(ptr, _) => *ptr,
             OwnedMutPtr::Owned(owned) => &raw mut **owned,
         }
     }
@@ -1205,7 +1207,7 @@ where
 impl<T: Sized> AsRef<T> for OwnedMutPtr<T> {
     fn as_ref(&self) -> &T {
         match self {
-            OwnedMutPtr::Ptr(p) => unsafe { p.as_ref().unwrap() },
+            OwnedMutPtr::Ptr(p, _) => unsafe { p.as_ref().unwrap() },
             OwnedMutPtr::Owned(b) => b.as_ref(),
         }
     }
@@ -1214,7 +1216,7 @@ impl<T: Sized> AsRef<T> for OwnedMutPtr<T> {
 impl<T: Sized> AsMut<T> for OwnedMutPtr<T> {
     fn as_mut(&mut self) -> &mut T {
         match self {
-            OwnedMutPtr::Ptr(p) => unsafe { p.as_mut().unwrap() },
+            OwnedMutPtr::Ptr(p, _) => unsafe { p.as_mut().unwrap() },
             OwnedMutPtr::Owned(b) => b.as_mut(),
         }
     }
@@ -1226,16 +1228,14 @@ where
 {
     fn is_owned(&self) -> bool {
         match self {
-            OwnedMutPtr::Ptr(_) => false,
+            OwnedMutPtr::Ptr(_, _) => false,
             OwnedMutPtr::Owned(_) => true,
         }
     }
 
     fn into_owned(self) -> Self {
         match self {
-            OwnedMutPtr::Ptr(p) => unsafe {
-                OwnedMutPtr::Owned(Box::new(p.as_ref().unwrap().clone()))
-            },
+            OwnedMutPtr::Ptr(..) => OwnedMutPtr::Owned(Box::new(self.as_ref().clone())),
             OwnedMutPtr::Owned(v) => OwnedMutPtr::Owned(v),
         }
     }
@@ -1261,5 +1261,57 @@ mod test {
         slice.truncate(0);
         slice.truncate(100);
         assert_eq!(0, slice.len());
+    }
+
+    #[test]
+    fn test_owned_slice_and_ptr_safety() {
+        use core::ptr;
+
+        use libafl_core::IntoOwned;
+
+        use crate::{OwnedMutPtr, OwnedMutSlice, OwnedPtr, OwnedRef, OwnedSlice};
+
+        for s in [
+            unsafe { OwnedSlice::<u8>::from_raw_parts(ptr::null(), 0) },
+            unsafe { OwnedSlice::<u8>::from_raw_parts(ptr::null(), 4) },
+        ] {
+            assert!(s.is_empty() && !s.is_owned());
+        }
+        let mut sm = unsafe { OwnedMutSlice::<u8>::from_raw_parts_mut(ptr::null_mut(), 4) };
+        sm.reverse();
+        assert!(sm.is_empty() && !sm.is_owned());
+
+        let val = 42u32;
+        assert!(unsafe { OwnedSlice::from_raw_parts(&raw const val, 0) }.is_empty());
+        assert!(!OwnedRef::Ref(&val).is_raw());
+        assert!(!OwnedRef::owned(42u32).is_raw());
+        assert!(unsafe { OwnedRef::from_ptr(&raw const val) }.is_raw());
+        let p = unsafe { OwnedPtr::from_raw(&raw const val) };
+        assert!(!p.is_owned());
+        let p_owned = p.into_owned();
+        assert!(p_owned.is_owned() && *p_owned.as_ref() == 42);
+
+        let mut slot = 10u64;
+        let mut raw_mp = unsafe { OwnedMutPtr::from_raw_mut(&raw mut slot) };
+        let mut cloned_mp = raw_mp.clone();
+        assert!(!raw_mp.is_owned() && cloned_mp.is_owned());
+        let (r1, r2) = (raw_mp.as_mut(), cloned_mp.as_mut());
+        *r1 = 20;
+        *r2 = 30;
+        assert_eq!((*raw_mp.as_ref(), *cloned_mp.as_ref(), slot), (20, 30, 20));
+
+        let mut backing = [1u8, 2, 3, 4];
+        let raw_slice =
+            unsafe { OwnedMutSlice::from_raw_parts_mut(backing.as_mut_ptr(), backing.len()) };
+        let shared_view: &[u8] = &raw_slice;
+        assert_eq!(
+            serde_json::to_string(&raw_slice).unwrap(),
+            "{\"inner\":[1,2,3,4]}"
+        );
+        assert_eq!(shared_view, &[1, 2, 3, 4]);
+        let elem_ref: &u8 = unsafe { &*raw_slice.as_ptr() };
+        let owned_slice = raw_slice.into_owned();
+        assert_eq!(*elem_ref, 1);
+        assert!(owned_slice.is_owned() && *owned_slice == [1, 2, 3, 4]);
     }
 }

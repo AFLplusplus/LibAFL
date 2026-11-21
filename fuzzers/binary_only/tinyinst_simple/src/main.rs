@@ -37,7 +37,7 @@ fn main() {
     // use file to pass testcases
     // let args = vec!["test.exe".to_string(), "-f".to_string(), "@@".to_string()];
 
-    let coverage = OwnedMutPtr::Ptr(&raw mut COVERAGE);
+    let coverage = unsafe { OwnedMutPtr::from_raw_mut(&raw mut COVERAGE) };
     let observer = ListObserver::new("cov", coverage);
     let mut feedback = ListFeedback::new(&observer);
     #[cfg(windows)]

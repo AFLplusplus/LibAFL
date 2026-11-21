@@ -39,8 +39,8 @@ impl<A, B, DOT, I, OTA, OTB, S> DiffExecutor<A, B, DOT, I, OTA, OTB, S> {
             primary,
             secondary,
             observers: UnsafeCell::new(ProxyObserversTuple {
-                primary: OwnedMutPtr::Ptr(ptr::null_mut()),
-                secondary: OwnedMutPtr::Ptr(ptr::null_mut()),
+                primary: unsafe { OwnedMutPtr::from_raw_mut(ptr::null_mut()) },
+                secondary: unsafe { OwnedMutPtr::from_raw_mut(ptr::null_mut()) },
                 differential: observers,
             }),
             phantom: PhantomData,
@@ -74,32 +74,29 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        self.observers(); // update in advance
-        let observers = self.observers.get_mut();
-        observers
-            .differential
-            .pre_observe_first_all(observers.primary.as_mut())?;
-        observers.primary.as_mut().pre_exec_all(state, input)?;
+        let diff = &mut self.observers.get_mut().differential;
+        {
+            let primary_obs = &mut *self.primary.observers_mut();
+            diff.pre_observe_first_all(primary_obs)?;
+            primary_obs.pre_exec_all(state, input)?;
+        }
         let ret1 = self.primary.run_target(fuzzer, state, mgr, input)?;
-        observers
-            .primary
-            .as_mut()
-            .post_exec_all(state, input, &ret1)?;
-        observers
-            .differential
-            .post_observe_first_all(observers.primary.as_mut())?;
-        observers
-            .differential
-            .pre_observe_second_all(observers.secondary.as_mut())?;
-        observers.secondary.as_mut().pre_exec_all(state, input)?;
+        {
+            let primary_obs = &mut *self.primary.observers_mut();
+            primary_obs.post_exec_all(state, input, &ret1)?;
+            diff.post_observe_first_all(primary_obs)?;
+        }
+        {
+            let secondary_obs = &mut *self.secondary.observers_mut();
+            diff.pre_observe_second_all(secondary_obs)?;
+            secondary_obs.pre_exec_all(state, input)?;
+        }
         let ret2 = self.secondary.run_target(fuzzer, state, mgr, input)?;
-        observers
-            .secondary
-            .as_mut()
-            .post_exec_all(state, input, &ret2)?;
-        observers
-            .differential
-            .post_observe_second_all(observers.secondary.as_mut())?;
+        {
+            let secondary_obs = &mut *self.secondary.observers_mut();
+            secondary_obs.post_exec_all(state, input, &ret2)?;
+            diff.post_observe_second_all(secondary_obs)?;
+        }
         if ret1 == ret2 {
             Ok(ret1)
         } else {
@@ -214,9 +211,9 @@ where
 }
 
 impl<A, B, DOT> ProxyObserversTuple<A, B, DOT> {
-    fn set(&mut self, primary: &A, secondary: &B) {
-        self.primary = OwnedMutPtr::Ptr(ptr::from_ref(primary).cast_mut());
-        self.secondary = OwnedMutPtr::Ptr(ptr::from_ref(secondary).cast_mut());
+    fn set_mut(&mut self, primary: &mut A, secondary: &mut B) {
+        self.primary = unsafe { OwnedMutPtr::from_raw_mut(ptr::from_mut(primary)) };
+        self.secondary = unsafe { OwnedMutPtr::from_raw_mut(ptr::from_mut(secondary)) };
     }
 }
 
@@ -233,23 +230,24 @@ where
     #[inline]
     fn observers(&self) -> RefIndexable<&Self::Observers, Self::Observers> {
         unsafe {
-            self.observers
-                .get()
-                .as_mut()
-                .unwrap()
-                .set(&*self.primary.observers(), &*self.secondary.observers());
-            RefIndexable::from(self.observers.get().as_ref().unwrap())
+            let proxy = self.observers.get();
+            (&raw mut (*proxy).primary).write(OwnedMutPtr::from_raw_mut(
+                ptr::from_ref(&*self.primary.observers()).cast_mut(),
+            ));
+            (&raw mut (*proxy).secondary).write(OwnedMutPtr::from_raw_mut(
+                ptr::from_ref(&*self.secondary.observers()).cast_mut(),
+            ));
+            RefIndexable::from(&*proxy)
         }
     }
 
     #[inline]
     fn observers_mut(&mut self) -> RefIndexable<&mut Self::Observers, Self::Observers> {
-        unsafe {
-            self.observers.get().as_mut().unwrap().set(
-                &*self.primary.observers_mut(),
-                &*self.secondary.observers_mut(),
-            );
-            RefIndexable::from(self.observers.get().as_mut().unwrap())
-        }
+        let proxy = self.observers.get_mut();
+        proxy.set_mut(
+            &mut *self.primary.observers_mut(),
+            &mut *self.secondary.observers_mut(),
+        );
+        RefIndexable::from(proxy)
     }
 }

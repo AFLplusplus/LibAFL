@@ -654,17 +654,14 @@ impl AsanErrorsObserver {
     /// The pointer *must* outlive this [`AsanErrorsObserver`]'s lifetime.
     #[must_use]
     pub unsafe fn from_ptr(errors: *const AsanErrors) -> Self {
-        Self::Ptr(OwnedPtr::Ptr(errors))
+        Self::Ptr(unsafe { OwnedPtr::from_raw(errors) })
     }
 
     /// Gets the [`struct@AsanErrors`] from the previous run
     #[must_use]
     pub fn errors(&self) -> AsanErrors {
         match self {
-            Self::Ptr(errors) => match errors {
-                OwnedPtr::Ptr(p) => unsafe { p.as_ref().unwrap().clone() },
-                OwnedPtr::Owned(b) => b.as_ref().clone(),
-            },
+            Self::Ptr(errors) => errors.as_ref().clone(),
             Self::Static => AsanErrors::get_mut_blocking().clone(),
         }
     }

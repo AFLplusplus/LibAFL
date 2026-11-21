@@ -121,7 +121,9 @@ impl<S, SHM, OT> HasObservers for TinyInstExecutor<S, SHM, OT> {
 /// # fn main() -> Result<(), libafl::Error> {
 /// static mut COVERAGE: Vec<u64> = Vec::new();
 ///
-/// let observer = ListObserver::new("cov", OwnedMutPtr::Ptr(&raw mut COVERAGE));
+/// let observer = ListObserver::new("cov", unsafe {
+///     OwnedMutPtr::from_raw_mut(&raw mut COVERAGE)
+/// });
 /// let mut executor = TinyInstExecutor::builder()
 ///     .instrument_module(["target.dll"])
 ///     .program_args(["./target", "@@"])

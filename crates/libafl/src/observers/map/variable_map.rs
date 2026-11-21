@@ -196,7 +196,7 @@ where
         VariableMapObserver {
             name: name.into(),
             map: map_slice,
-            size: OwnedMutPtr::Ptr(size),
+            size: unsafe { OwnedMutPtr::from_raw_mut(size) },
             initial: T::default(),
         }
     }
