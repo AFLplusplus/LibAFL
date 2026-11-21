@@ -60,6 +60,9 @@ const UNIX_SERVER_NAME: &str = "./libafl_unix_shmem_server";
 /// Env variable. If set, we won't try to spawn the service
 const AFL_SHMEM_SERVICE_STARTED: &str = "AFL_SHMEM_SERVICE_STARTED";
 
+/// Serializes in-process [`ShMemService`] startup and teardown.
+static SHMEM_SERVICE_RUNNING: Mutex<bool> = Mutex::new(false);
+
 ///     s out served shared maps, as used on Android.
 #[derive(Debug)]
 pub struct ServedShMemProvider<SP> {
@@ -76,7 +79,8 @@ pub struct ServedShMemProvider<SP> {
 /// It works around Android's lack of "proper" shared maps.
 #[derive(Debug, Clone)]
 pub struct ServedShMem<SHM> {
-    inner: ManuallyDrop<SHM>,
+    inner: Option<ManuallyDrop<SHM>>,
+    client_id: ShMemId,
     server_fd: i32,
 }
 
@@ -87,7 +91,10 @@ where
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        match &self.inner {
+            Some(shm) => shm,
+            None => &[],
+        }
     }
 }
 
@@ -96,7 +103,10 @@ where
     SHM: DerefMut<Target = [u8]>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        match &mut self.inner {
+            Some(shm) => shm,
+            None => &mut [],
+        }
     }
 }
 
@@ -107,8 +117,7 @@ where
     SHM: ShMem,
 {
     fn id(&self) -> ShMemId {
-        let client_id = self.inner.id();
-        ShMemId::from_string(&format!("{}:{client_id}", self.server_fd))
+        ShMemId::from_string(&format!("{}:{}", self.server_fd, self.client_id))
     }
 }
 
@@ -139,7 +148,7 @@ impl<SP> ServedShMemProvider<SP> {
         }
 
         let server_id = ShMemId::from_array(&shm_slice);
-        let server_fd: i32 = server_id.into();
+        let server_fd = crate::parse_shmem_id_i32(server_id)?;
         Ok((server_fd, fd_buf[0]))
     }
 
@@ -199,29 +208,34 @@ where
 
     fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::NewMap(map_size))?;
+        let shm = self
+            .inner
+            .shmem_from_id_and_size(ShMemId::from_string(&format!("{client_fd}")), map_size)?;
+        let client_id = shm.id();
 
         Ok(ServedShMem {
-            inner: ManuallyDrop::new(
-                self.inner.shmem_from_id_and_size(
-                    ShMemId::from_string(&format!("{client_fd}")),
-                    map_size,
-                )?,
-            ),
+            inner: Some(ManuallyDrop::new(shm)),
+            client_id,
             server_fd,
         })
     }
 
     fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error> {
-        let parts = id.as_str().split(':').collect::<Vec<&str>>();
-        let server_id_str = parts.first().unwrap();
+        let id_str = core::ffi::CStr::from_bytes_until_nul(&id.id)
+            .ok()
+            .and_then(|c| c.to_str().ok())
+            .ok_or_else(|| Error::illegal_argument(format!("Invalid ShMemId {id:?}")))?;
+        let server_id_str = id_str.split(':').next().unwrap_or(id_str);
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::ExistingMap(
             ShMemDescription::from_string_and_size(server_id_str, size),
         ))?;
+        let shm = self
+            .inner
+            .shmem_from_id_and_size(ShMemId::from_string(&format!("{client_fd}")), size)?;
+        let client_id = shm.id();
         Ok(ServedShMem {
-            inner: ManuallyDrop::new(
-                self.inner
-                    .shmem_from_id_and_size(ShMemId::from_string(&format!("{client_fd}")), size)?,
-            ),
+            inner: Some(ManuallyDrop::new(shm)),
+            client_id,
             server_fd,
         })
     }
@@ -253,14 +267,15 @@ where
         if self.about_to_restart {
             return;
         }
+        let Some(inner) = map.inner.take() else {
+            return;
+        };
 
         let (refcount, _) = self
             .send_receive(ServedShMemRequest::Deregister(map.server_fd))
             .expect("Could not communicate with ServedShMem server!");
         if refcount == 1 {
-            unsafe {
-                ManuallyDrop::drop(&mut map.inner);
-            }
+            ManuallyDrop::into_inner(inner);
         }
     }
 }
@@ -347,10 +362,14 @@ pub struct ShMemServiceThread {
 impl Drop for ShMemServiceThread {
     fn drop(&mut self) {
         if self.join_handle.is_some() {
+            let mut running = SHMEM_SERVICE_RUNNING
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             log::info!("Stopping ShMemService");
             let Ok(mut stream) =
                 UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap())
             else {
+                *running = false;
                 return;
             };
 
@@ -373,8 +392,7 @@ impl Drop for ShMemServiceThread {
             #[cfg(target_vendor = "apple")]
             fs::remove_file(UNIX_SERVER_NAME).unwrap();
 
-            // TODO: Audit that the environment access only happens in single-threaded code.
-            unsafe { env::remove_var(AFL_SHMEM_SERVICE_STARTED) };
+            *running = false;
         }
     }
 }
@@ -387,8 +405,16 @@ where
     /// Returns [`ShMemService::Failed`] on error.
     #[must_use]
     pub fn start() -> Self {
-        // Already running, no need to spawn additional thraeds anymore.
-        if env::var(AFL_SHMEM_SERVICE_STARTED).is_ok() {
+        if env::var_os(AFL_SHMEM_SERVICE_STARTED).is_some() {
+            return Self::Failed {
+                err_msg: "ShMemService already started".to_string(),
+                phantom: PhantomData,
+            };
+        }
+        let mut running = SHMEM_SERVICE_RUNNING
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if *running {
             return Self::Failed {
                 err_msg: "ShMemService already started".to_string(),
                 phantom: PhantomData,
@@ -425,17 +451,12 @@ where
             success = cvar.wait(success).unwrap();
         }
 
-        // Optimization: Following calls or even child processe don't need to try to start a service anymore.
-        // It's either running at this point, or we won't be able to spawn it anyway.
-        // TODO: Audit that the environment access only happens in single-threaded code.
-        unsafe { env::set_var(AFL_SHMEM_SERVICE_STARTED, "true") };
-
         let status = *success;
         match status {
             ShMemServiceStatus::Starting => panic!("Unreachable"),
             ShMemServiceStatus::Started => {
+                *running = true;
                 log::info!("Started ShMem Service");
-                // We got a service
                 Self::Started {
                     bg_thread: Arc::new(Mutex::new(ShMemServiceThread {
                         join_handle: Some(join_handle),
@@ -690,7 +711,7 @@ where
             let copied_poll_fds: Vec<PollFd> = poll_fds.clone();
             for poll_fd in copied_poll_fds {
                 let revents = poll_fd.revents().expect("revents should not be None");
-                let raw_polled_fd = unsafe { *((&raw const poll_fd) as *const libc::pollfd) }.fd;
+                let raw_polled_fd = poll_fd.as_fd().as_raw_fd();
                 if revents.contains(PollFlags::POLLHUP) {
                     poll_fds.remove(poll_fds.iter().position(|item| *item == poll_fd).unwrap());
                     self.clients.remove(&raw_polled_fd);
