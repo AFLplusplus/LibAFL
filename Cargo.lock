@@ -2755,7 +2755,6 @@ dependencies = [
  "static_assertions",
  "tuple_list",
  "tuple_list_ex",
- "uds",
  "wide",
  "winapi",
  "windows 0.62.2",
@@ -5112,7 +5111,7 @@ dependencies = [
  "rustversion",
  "serde",
  "serial_test",
- "uds",
+ "unix-ancillary",
  "uuid",
  "windows 0.62.2",
 ]
@@ -5978,15 +5977,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "214ca0b2191785cbc06209b9ca1861e048e39b5ba33574b3cedd58363d5bb5f6"
 
 [[package]]
-name = "uds"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "885c31f06fce836457fe3ef09a59f83fe8db95d270b11cd78f40a4666c4d1661"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "unicase"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6051,6 +6041,15 @@ dependencies = [
  "cmake",
  "heck 0.5.0",
  "pkg-config",
+]
+
+[[package]]
+name = "unix-ancillary"
+version = "0.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d201fbbb644b442e308dff48a3666f611d541aad40e791db0d06a2bdf28cd78"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

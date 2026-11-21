@@ -30,7 +30,7 @@ document-features = ["dep:document-features"]
 std = [
   "alloc",
   "libafl_core/std",
-  "uds",
+  "unix-ancillary",
   "nix",
   "libafl_core/nix",
   "serial_test",
@@ -66,7 +66,7 @@ uuid = { workspace = true, optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true }
-uds = { version = "0.4.2", optional = true, default-features = false }
+unix-ancillary = { version = "0.6.3", optional = true }
 nix = { workspace = true, optional = true, default-features = false, features = [
   "fs",
   "signal",
