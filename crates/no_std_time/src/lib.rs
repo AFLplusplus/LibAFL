@@ -95,6 +95,9 @@ pub fn format_duration(duration: &time::Duration) -> String {
 
 #[cfg(all(any(doctest, test), not(feature = "std")))]
 /// Provide custom time in `no_std` tests.
+///
+/// # Safety
+/// Test stub returning a constant timestamp.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn external_current_millis() -> u64 {
     // TODO: use "real" time here

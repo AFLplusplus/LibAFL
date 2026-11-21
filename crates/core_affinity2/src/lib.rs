@@ -249,10 +249,19 @@ impl From<Vec<usize>> for Cores {
     }
 }
 
+impl core::str::FromStr for Cores {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_cmdline(s)
+    }
+}
+
 impl TryFrom<&str> for Cores {
     type Error = Error;
+
     fn try_from(cores: &str) -> Result<Self, Self::Error> {
-        Self::from_cmdline(cores)
+        cores.parse()
     }
 }
 
@@ -280,12 +289,6 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
     unix::set_for_current(core_id)
 }
 
-#[cfg(any(
-    target_os = "android",
-    target_os = "linux",
-    target_os = "dragonfly",
-    target_os = "freebsd"
-))]
 #[cfg(any(
     target_os = "android",
     target_os = "linux",
@@ -1146,6 +1149,15 @@ mod tests {
     use std::thread::available_parallelism;
 
     use super::*;
+
+    #[test]
+    fn test_cores_from_str() {
+        let parsed: Cores = "0,2-4".parse().unwrap();
+        let via_try_from = Cores::try_from("0,2-4").unwrap();
+        assert_eq!(parsed.ids, via_try_from.ids);
+        assert_eq!(parsed.ids.len(), 4);
+        assert!("not-a-core-list".parse::<Cores>().is_err());
+    }
 
     #[test]
     #[cfg_attr(any(miri, target_os = "freebsd"), ignore)]

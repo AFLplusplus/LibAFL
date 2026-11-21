@@ -37,7 +37,7 @@ use crate::{
     state::{HasExecutions, HasLastReportTime, MaybeHasClientPerfMonitor, Stoppable},
 };
 
-pub(crate) const _LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
+pub(crate) const LLMP_TAG_TO_MAIN: Tag = Tag(0x3453453);
 
 /// A wrapper manager to implement a main-secondary architecture with another broker
 #[derive(Debug)]
@@ -353,13 +353,13 @@ where
         match self.compressor.maybe_compress(&serialized) {
             Some(comp_buf) => {
                 self.client.send_buf_with_flags(
-                    _LLMP_TAG_TO_MAIN,
+                    LLMP_TAG_TO_MAIN,
                     flags | LLMP_FLAG_COMPRESSED,
                     &comp_buf,
                 )?;
             }
             None => {
-                self.client.send_buf(_LLMP_TAG_TO_MAIN, &serialized)?;
+                self.client.send_buf(LLMP_TAG_TO_MAIN, &serialized)?;
             }
         }
         Ok(())
@@ -368,7 +368,7 @@ where
     #[cfg(not(feature = "llmp_compression"))]
     fn forward_to_main(&mut self, event: &EventWithStats<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(event)?;
-        self.client.send_buf(_LLMP_TAG_TO_MAIN, &serialized)?;
+        self.client.send_buf(LLMP_TAG_TO_MAIN, &serialized)?;
         Ok(())
     }
 
@@ -380,7 +380,7 @@ where
         let self_id = self.client.sender().id();
         while let Some((client_id, tag, _flags, msg)) = self.client.recv_buf_with_flags()? {
             assert!(
-                tag == _LLMP_TAG_TO_MAIN,
+                tag == LLMP_TAG_TO_MAIN,
                 "Only _LLMP_TAG_TO_MAIN parcel should have arrived in the main node!"
             );
 

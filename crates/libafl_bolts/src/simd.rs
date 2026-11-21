@@ -233,7 +233,7 @@ pub trait VectorType {
     fn to_slice(&self) -> &[u8];
 
     /// Deprecated fallback for [`Self::to_slice`]
-    #[deprecated(note = "Use to_slice instead")]
+    #[deprecated(since = "0.14.0", note = "Use to_slice instead")]
     fn as_slice(&self) -> &[u8] {
         self.to_slice()
     }

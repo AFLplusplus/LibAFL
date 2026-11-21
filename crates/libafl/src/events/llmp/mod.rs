@@ -38,7 +38,7 @@ pub use restarting::*;
 /// Forward this to the client
 pub(crate) const _LLMP_TAG_EVENT_TO_CLIENT: Tag = Tag(0x2C11E471);
 /// Only handle this in the broker
-pub(crate) const _LLMP_TAG_EVENT_TO_BROKER: Tag = Tag(0x2B80438);
+pub(crate) const LLMP_TAG_EVENT_TO_BROKER: Tag = Tag(0x2B80438);
 /// Handle in both
 pub(crate) const LLMP_TAG_EVENT_TO_BOTH: Tag = Tag(0x2B0741);
 pub(crate) const _LLMP_TAG_RESTART: Tag = Tag(0x8357A87);
@@ -488,7 +488,7 @@ where
         let self_id = self.llmp.sender().id();
         while let Some((client_id, tag, flags, msg)) = self.llmp.recv_buf_with_flags()? {
             assert_ne!(
-                tag, _LLMP_TAG_EVENT_TO_BROKER,
+                tag, LLMP_TAG_EVENT_TO_BROKER,
                 "EVENT_TO_BROKER parcel should not have arrived in the client!"
             );
 
@@ -775,7 +775,7 @@ where
         let mut count = 0;
         while let Some((client_id, tag, _flags, msg)) = self.llmp.recv_buf_with_flags()? {
             assert_ne!(
-                tag, _LLMP_TAG_EVENT_TO_BROKER,
+                tag, LLMP_TAG_EVENT_TO_BROKER,
                 "EVENT_TO_BROKER parcel should not have arrived in the client!"
             );
 

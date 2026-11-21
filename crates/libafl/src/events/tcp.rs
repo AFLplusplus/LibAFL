@@ -28,7 +28,10 @@ use super::{AwaitRestartSafe, SendExiting, std_maybe_report_progress, std_report
 /// The env var that tells the client that it is the initial client
 pub const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT_INITIAL";
 /// The env var that tells the client that it is a sender
-pub const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
+pub const ENV_FUZZER_SENDER: &str = super::restarting::ENV_FUZZER_SENDER;
+/// Deprecated alias for [`ENV_FUZZER_SENDER`].
+#[deprecated(since = "0.16.2", note = "Use ENV_FUZZER_SENDER instead")]
+pub const _ENV_FUZZER_SENDER: &str = ENV_FUZZER_SENDER;
 
 use crate::{
     Error, HasMetadata,
@@ -955,7 +958,7 @@ where
     SP: ShMemProvider,
 {
     // We start ourself as child process to actually fuzz
-    let (_mgr, _core_id) = if env::var(_ENV_FUZZER_SENDER).is_err() {
+    let (_mgr, _core_id) = if env::var(ENV_FUZZER_SENDER).is_err() {
         let broker_things = |mut broker: TcpEventBroker<I, MT>,
                              _remote_broker_addr: Option<SocketAddr>| {
             if let Some(exit_cleanly_after) = exit_cleanly_after {
@@ -1064,7 +1067,7 @@ where
         |state: Option<Option<ClientId>>| {
             let this_id = state.flatten().unwrap_or(UNDEFINED_CLIENT_ID);
 
-            let (_mgr, _core_id) = if env::var(_ENV_FUZZER_SENDER).is_err() {
+            let (_mgr, _core_id) = if env::var(ENV_FUZZER_SENDER).is_err() {
                 let broker_things =
                     |mut broker: TcpEventBroker<I, MT>, _remote_broker_addr: Option<SocketAddr>| {
                         if let Some(exit_cleanly_after) = exit_cleanly_after {

@@ -320,15 +320,15 @@ impl MOpt {
         let select_prob: f64 =
             self.probability_now[self.swarm_now][operator_num - 1] * self.rand.next_float();
 
-        for i in 0..operator_num {
-            if i == 0 {
-                if select_prob < self.probability_now[self.swarm_now][i] {
-                    res = i;
-                    break;
-                }
-            } else if select_prob < self.probability_now[self.swarm_now][i] {
+        for (i, &prob) in self.probability_now[self.swarm_now][..operator_num]
+            .iter()
+            .enumerate()
+        {
+            if select_prob < prob {
                 res = i;
-                sentry = 1;
+                if i != 0 {
+                    sentry = 1;
+                }
                 break;
             }
         }
@@ -478,9 +478,10 @@ where
 
                         let mut swarm_eff = 0.0;
                         let mut best_swarm = 0;
-                        for i in 0..mopt.swarm_num {
-                            if mopt.swarm_fitness[i] > swarm_eff {
-                                swarm_eff = mopt.swarm_fitness[i];
+                        for (i, &fitness) in mopt.swarm_fitness[..mopt.swarm_num].iter().enumerate()
+                        {
+                            if fitness > swarm_eff {
+                                swarm_eff = fitness;
                                 best_swarm = i;
                             }
                         }

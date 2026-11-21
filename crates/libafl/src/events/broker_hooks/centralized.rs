@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 
 #[cfg(feature = "llmp_compression")]
 use crate::events::COMPRESS_THRESHOLD;
-use crate::events::{_LLMP_TAG_TO_MAIN, BrokerEventResult, Event, EventWithStats};
+use crate::events::{BrokerEventResult, Event, EventWithStats, LLMP_TAG_TO_MAIN};
 
 /// An LLMP-backed event manager for scalable multi-processed fuzzing
 pub struct CentralizedLlmpHook<I> {
@@ -33,7 +33,7 @@ where
         msg: &mut [u8],
         _new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
-        if *msg_tag == _LLMP_TAG_TO_MAIN {
+        if *msg_tag == LLMP_TAG_TO_MAIN {
             #[cfg(feature = "llmp_compression")]
             let compressor = &self.compressor;
             #[cfg(not(feature = "llmp_compression"))]

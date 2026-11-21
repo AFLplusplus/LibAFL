@@ -276,20 +276,14 @@ where
 
     /// Reset the map
     pub fn reset(&mut self) -> Result<(), Error> {
-        let cnt = self.history_map.len();
-        for i in 0..cnt {
-            self.history_map[i] = T::default();
-        }
+        self.history_map.fill(T::default());
         self.num_covered_map_indexes = 0;
         Ok(())
     }
 
     /// Reset the map with any value
     pub fn reset_with_value(&mut self, value: T) -> Result<(), Error> {
-        let cnt = self.history_map.len();
-        for i in 0..cnt {
-            self.history_map[i] = value;
-        }
+        self.history_map.fill(value);
         // assume that resetting the map should indicate no coverage,
         // regardless of value
         self.num_covered_map_indexes = 0;

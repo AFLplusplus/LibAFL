@@ -267,7 +267,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
     where
         P: AsRef<Path>,
     {
-        Self::_new(
+        Self::new_inner(
             dir_path.as_ref(),
             Some(OnDiskMetadataFormat::JsonPretty),
             None,
@@ -285,7 +285,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), meta_format, None, true)
+        Self::new_inner(dir_path.as_ref(), meta_format, None, true)
     }
 
     /// Creates the [`InMemoryOnDiskCorpus`] specifying the format in which `Metadata` will be saved to disk
@@ -301,7 +301,7 @@ impl<I> InMemoryOnDiskCorpus<I> {
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), meta_format, prefix, locking)
+        Self::new_inner(dir_path.as_ref(), meta_format, prefix, locking)
     }
 
     /// Creates an [`InMemoryOnDiskCorpus`] that will not store .metadata files
@@ -311,11 +311,11 @@ impl<I> InMemoryOnDiskCorpus<I> {
     where
         P: AsRef<Path>,
     {
-        Self::_new(dir_path.as_ref(), None, None, true)
+        Self::new_inner(dir_path.as_ref(), None, None, true)
     }
 
     /// Private fn to crate a new corpus at the given (non-generic) path with the given optional `meta_format`
-    fn _new(
+    fn new_inner(
         dir_path: &Path,
         meta_format: Option<OnDiskMetadataFormat>,
         prefix: Option<String>,

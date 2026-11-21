@@ -26,7 +26,10 @@ use crate::{
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it
-pub const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
+pub const ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
+/// Deprecated alias for [`ENV_FUZZER_SENDER`].
+#[deprecated(since = "0.16.2", note = "Use ENV_FUZZER_SENDER instead")]
+pub const _ENV_FUZZER_SENDER: &str = ENV_FUZZER_SENDER;
 
 /// A trait for event managers that can be restored from a state restorer
 pub trait Restorable<S, SP>
@@ -212,7 +215,7 @@ where
         F: FnOnce(StateRestorer<SP::ShMem, SP>, SP, Option<CoreId>) -> Result<R, Error>,
     {
         // We start ourselves as child process to actually fuzz
-        let (staterestorer, new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
+        let (staterestorer, new_shmem_provider, core_id) = if std::env::var(ENV_FUZZER_SENDER)
             .is_err()
         {
             // First, create a channel from the current fuzzer to the next to store state between restarts.
@@ -223,7 +226,7 @@ where
             // # Safety
             // Very likely single threaded here.
             unsafe {
-                staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+                staterestorer.write_to_env(ENV_FUZZER_SENDER)?;
             }
 
             let mut ctr: u64 = 0;
@@ -299,7 +302,7 @@ where
             // We get here *only on Windows*, if we were started by a restarting fuzzer.
             // A staterestorer and a receiver for single communication
             (
-                StateRestorer::from_env(&mut self.shmem_provider, _ENV_FUZZER_SENDER)?,
+                StateRestorer::from_env(&mut self.shmem_provider, ENV_FUZZER_SENDER)?,
                 self.shmem_provider.clone(),
                 None,
             )

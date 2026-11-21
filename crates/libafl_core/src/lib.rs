@@ -645,7 +645,7 @@ where
 }
 
 /// Can be converted to a slice
-#[deprecated(note = "Use ToSlice instead")]
+#[deprecated(since = "0.16.0", note = "Use ToSlice instead")]
 #[allow(deprecated)]
 pub trait AsSlice<'a>: ToSlice<'a> {
     /// Type of the entries of this slice
@@ -668,7 +668,7 @@ impl<'a, T: ?Sized + ToSlice<'a>> AsSlice<'a> for T {
 }
 
 /// Can be converted to a slice
-#[deprecated(note = "Use ToSizedSlice instead")]
+#[deprecated(since = "0.16.0", note = "Use ToSizedSlice instead")]
 #[allow(deprecated)]
 pub trait AsSizedSlice<'a, const N: usize>: ToSizedSlice<'a, N> {
     /// Type of the entries of this slice
@@ -691,7 +691,7 @@ impl<'a, const N: usize, T: ?Sized + ToSizedSlice<'a, N>> AsSizedSlice<'a, N> fo
 }
 
 /// Can be converted to a mutable slice
-#[deprecated(note = "Use ToSliceMut instead")]
+#[deprecated(since = "0.16.0", note = "Use ToSliceMut instead")]
 #[allow(deprecated)]
 pub trait AsSliceMut<'a>: AsSlice<'a> + ToSliceMut<'a> {
     /// Type of the mutable reference to this slice
@@ -711,7 +711,7 @@ impl<'a, T: ?Sized + ToSliceMut<'a>> AsSliceMut<'a> for T {
 }
 
 /// Can be converted to a mutable slice
-#[deprecated(note = "Use ToSizedSliceMut instead")]
+#[deprecated(since = "0.16.0", note = "Use ToSizedSliceMut instead")]
 #[allow(deprecated)]
 pub trait AsSizedSliceMut<'a, const N: usize>:
     AsSizedSlice<'a, N> + ToSizedSliceMut<'a, N>

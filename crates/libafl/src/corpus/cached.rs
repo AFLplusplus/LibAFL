@@ -222,7 +222,7 @@ impl<I> CachedOnDiskCorpus<I> {
     where
         P: AsRef<Path>,
     {
-        Self::_new(InMemoryOnDiskCorpus::new(dir_path)?, cache_max_len)
+        Self::new_inner(InMemoryOnDiskCorpus::new(dir_path)?, cache_max_len)
     }
 
     /// Creates an [`CachedOnDiskCorpus`] that does not store [`Testcase`] metadata to disk.
@@ -230,7 +230,7 @@ impl<I> CachedOnDiskCorpus<I> {
     where
         P: AsRef<Path>,
     {
-        Self::_new(InMemoryOnDiskCorpus::no_meta(dir_path)?, cache_max_len)
+        Self::new_inner(InMemoryOnDiskCorpus::no_meta(dir_path)?, cache_max_len)
     }
 
     /// Creates the [`CachedOnDiskCorpus`] specifying the format in which `Metadata` will be saved to disk.
@@ -244,7 +244,7 @@ impl<I> CachedOnDiskCorpus<I> {
     where
         P: AsRef<Path>,
     {
-        Self::_new(
+        Self::new_inner(
             InMemoryOnDiskCorpus::with_meta_format(dir_path, meta_format)?,
             cache_max_len,
         )
@@ -264,7 +264,7 @@ impl<I> CachedOnDiskCorpus<I> {
     where
         P: AsRef<Path>,
     {
-        Self::_new(
+        Self::new_inner(
             InMemoryOnDiskCorpus::with_meta_format_and_prefix(
                 dir_path,
                 meta_format,
@@ -276,7 +276,10 @@ impl<I> CachedOnDiskCorpus<I> {
     }
 
     /// Internal constructor `fn`
-    fn _new(on_disk_corpus: InMemoryOnDiskCorpus<I>, cache_max_len: usize) -> Result<Self, Error> {
+    fn new_inner(
+        on_disk_corpus: InMemoryOnDiskCorpus<I>,
+        cache_max_len: usize,
+    ) -> Result<Self, Error> {
         if cache_max_len == 0 {
             return Err(Error::illegal_argument(
                 "The max cache len in CachedOnDiskCorpus cannot be 0",

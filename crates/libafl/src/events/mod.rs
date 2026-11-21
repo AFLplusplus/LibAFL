@@ -725,6 +725,41 @@ impl HasEventManagerId for NopEventManager {
     }
 }
 
+/// Specify if the State must be persistent over restarts
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ShouldSaveState {
+    /// Always save and restore the state on restart (not OOM resistant)
+    OnRestart,
+    /// Never save the state (not OOM resistant)
+    Never,
+    /// Best-effort save and restore the state on restart (OOM safe)
+    /// This adds additional runtime costs when processing events
+    OOMSafeOnRestart,
+    /// Never save the state (OOM safe)
+    /// This adds additional runtime costs when processing events
+    OOMSafeNever,
+}
+
+impl ShouldSaveState {
+    /// Check if the state must be saved `on_restart()`
+    #[must_use]
+    pub fn on_restart(&self) -> bool {
+        matches!(
+            self,
+            ShouldSaveState::OnRestart | ShouldSaveState::OOMSafeOnRestart
+        )
+    }
+
+    /// Check if the policy is OOM safe
+    #[must_use]
+    pub fn oom_safe(&self) -> bool {
+        matches!(
+            self,
+            ShouldSaveState::OOMSafeOnRestart | ShouldSaveState::OOMSafeNever
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -773,40 +808,5 @@ mod tests {
             }
             _ => panic!("mistmatch"),
         }
-    }
-}
-
-/// Specify if the State must be persistent over restarts
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum ShouldSaveState {
-    /// Always save and restore the state on restart (not OOM resistant)
-    OnRestart,
-    /// Never save the state (not OOM resistant)
-    Never,
-    /// Best-effort save and restore the state on restart (OOM safe)
-    /// This adds additional runtime costs when processing events
-    OOMSafeOnRestart,
-    /// Never save the state (OOM safe)
-    /// This adds additional runtime costs when processing events
-    OOMSafeNever,
-}
-
-impl ShouldSaveState {
-    /// Check if the state must be saved `on_restart()`
-    #[must_use]
-    pub fn on_restart(&self) -> bool {
-        matches!(
-            self,
-            ShouldSaveState::OnRestart | ShouldSaveState::OOMSafeOnRestart
-        )
-    }
-
-    /// Check if the policy is OOM safe
-    #[must_use]
-    pub fn oom_safe(&self) -> bool {
-        matches!(
-            self,
-            ShouldSaveState::OOMSafeOnRestart | ShouldSaveState::OOMSafeNever
-        )
     }
 }

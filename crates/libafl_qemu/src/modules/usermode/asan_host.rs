@@ -774,13 +774,11 @@ impl AsanGiovese {
         // # Safety
         // Will access the global [`FullBacktraceCollector`].
         // Calling this function concurrently might be racey.
-        let backtrace = FullBacktraceCollector::backtrace()
-            .map(|r| {
-                let mut v = r.to_vec();
-                v.push(pc);
-                v
-            })
-            .unwrap_or_default();
+        let backtrace = FullBacktraceCollector::backtrace().map_or_else(Vec::new, |r| {
+            let mut v = r.to_vec();
+            v.push(pc);
+            v
+        });
         self.alloc_tree
             .lock()
             .unwrap()
@@ -805,13 +803,11 @@ impl AsanGiovese {
         let mut chunk = None;
         self.alloc_map_mut(addr, |interval, item| {
             chunk = Some(*interval);
-            let backtrace = FullBacktraceCollector::backtrace()
-                .map(|r| {
-                    let mut v = r.to_vec();
-                    v.push(pc);
-                    v
-                })
-                .unwrap_or_default();
+            let backtrace = FullBacktraceCollector::backtrace().map_or_else(Vec::new, |r| {
+                let mut v = r.to_vec();
+                v.push(pc);
+                v
+            });
             item.free(backtrace);
         });
         if let Some(ck) = chunk {

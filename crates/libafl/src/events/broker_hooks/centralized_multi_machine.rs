@@ -24,7 +24,7 @@ use tokio::{
 use crate::{
     events::{
         EventWithStats,
-        centralized::_LLMP_TAG_TO_MAIN,
+        centralized::LLMP_TAG_TO_MAIN,
         multi_machine::{MultiMachineMsg, TcpMultiMachineState},
     },
     inputs::Input,
@@ -205,21 +205,21 @@ where
                         #[cfg(feature = "llmp_compression")]
                         match state_wr_lock.compressor().maybe_compress(msg.as_ref()) {
                             Some(comp_buf) => Ok((
-                                _LLMP_TAG_TO_MAIN,
+                                LLMP_TAG_TO_MAIN,
                                 LLMP_FLAG_COMPRESSED | LLMP_FLAG_FROM_MM,
                                 comp_buf,
                             )),
-                            None => Ok((_LLMP_TAG_TO_MAIN, LLMP_FLAG_FROM_MM, msg)),
+                            None => Ok((LLMP_TAG_TO_MAIN, LLMP_FLAG_FROM_MM, msg)),
                         }
                         #[cfg(not(feature = "llmp_compression"))]
-                        Ok((_LLMP_TAG_TO_MAIN, LLMP_FLAG_FROM_MM, msg))
+                        Ok((LLMP_TAG_TO_MAIN, LLMP_FLAG_FROM_MM, msg))
                     }
                     MultiMachineMsg::Event(evt) => {
                         let evt = evt.into_owned().unwrap();
                         let (inner_flags, buf) =
                             Self::try_compress(&mut state_wr_lock, evt.as_ref())?;
 
-                        Ok((_LLMP_TAG_TO_MAIN, inner_flags | LLMP_FLAG_FROM_MM, buf))
+                        Ok((LLMP_TAG_TO_MAIN, inner_flags | LLMP_FLAG_FROM_MM, buf))
                     }
                 })
                 .collect();

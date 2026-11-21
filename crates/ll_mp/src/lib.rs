@@ -199,18 +199,20 @@ pub const LLMP_FLAG_FROM_MM: Flags = Flags(0x4);
 
 /// Timt the broker 2 broker connection waits for incoming data,
 /// before checking for own data to forward again.
-const _LLMP_B2B_BLOCK_TIME: Duration = Duration::from_secs(3);
+#[cfg(feature = "std")]
+const LLMP_B2B_BLOCK_TIME: Duration = Duration::from_secs(3);
 
 /// If broker2broker is enabled, bind to public IP
-#[cfg(feature = "llmp_bind_public")]
-const _LLMP_BIND_ADDR: &str = "0.0.0.0";
+#[cfg(all(feature = "std", feature = "llmp_bind_public"))]
+const LLMP_BIND_ADDR: &str = "0.0.0.0";
 
 /// If broker2broker is disabled, bind to localhost
-#[cfg(not(feature = "llmp_bind_public"))]
-const _LLMP_BIND_ADDR: &str = "127.0.0.1";
+#[cfg(all(feature = "std", not(feature = "llmp_bind_public")))]
+const LLMP_BIND_ADDR: &str = "127.0.0.1";
 
 /// An env var of this value indicates that the set value was a NULL PTR
-const _NULL_ENV_STR: &str = "_NULL";
+#[cfg(feature = "std")]
+const NULL_ENV_STR: &str = "_NULL";
 
 /// Magic indicating that a got initialized correctly
 const PAGE_INITIALIZED_MAGIC: u64 = 0x1A1A1A1A1A1A1AF1;
@@ -495,19 +497,19 @@ const fn llmp_align(to_align: usize) -> usize {
 #[inline]
 fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, Error> {
     let msg_offset_str = env::var(format!("{env_name}_OFFSET"))?;
-    Ok(if msg_offset_str == _NULL_ENV_STR {
+    Ok(if msg_offset_str == NULL_ENV_STR {
         None
     } else {
         Some(msg_offset_str.parse()?)
     })
 }
 
-/// Bind to a tcp port on the [`_LLMP_BIND_ADDR`] (local, or global)
+/// Bind to a tcp port on the [`LLMP_BIND_ADDR`] (local, or global)
 /// on a given `port`.
 /// Will set `SO_REUSEADDR` on unix.
 #[cfg(feature = "std")]
 fn tcp_bind(port: u16) -> Result<TcpListener, Error> {
-    let listener = TcpListener::bind((_LLMP_BIND_ADDR, port)).map_err(|err| {
+    let listener = TcpListener::bind((LLMP_BIND_ADDR, port)).map_err(|err| {
         let err_msg = format!("Failed to bind to port {port}: {err}");
         Error::os_error(err, err_msg)
     })?;
@@ -1483,7 +1485,7 @@ where
     #[inline]
     fn client_id_from_env(env_name: &str) -> Result<Option<ClientId>, Error> {
         let client_id_str = env::var(format!("{env_name}_CLIENT_ID"))?;
-        Ok(if client_id_str == _NULL_ENV_STR {
+        Ok(if client_id_str == NULL_ENV_STR {
             None
         } else {
             Some(ClientId(client_id_str.parse()?))
@@ -2202,7 +2204,7 @@ where
     pub unsafe fn msg_to_env(&self, msg: *const LlmpMsg, map_env_name: &str) -> Result<(), Error> {
         if msg.is_null() {
             // TODO: Audit that the environment access only happens in single-threaded code.
-            unsafe { env::set_var(format!("{map_env_name}_OFFSET"), _NULL_ENV_STR) };
+            unsafe { env::set_var(format!("{map_env_name}_OFFSET"), NULL_ENV_STR) };
         } else {
             // TODO: Audit that the environment access only happens in single-threaded code.
             unsafe {
@@ -3333,7 +3335,7 @@ where
 
             // The background thread blocks on the incoming connection for 15 seconds (if no data is available), then checks if it should forward own messages, then blocks some more.
             stream
-                .set_read_timeout(Some(_LLMP_B2B_BLOCK_TIME))
+                .set_read_timeout(Some(LLMP_B2B_BLOCK_TIME))
                 .expect("Failed to set tcp stream timeout");
 
             let mut new_sender =

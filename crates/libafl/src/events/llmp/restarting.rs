@@ -77,8 +77,6 @@ where
 
 use crate::events::ShouldSaveState;
 
-/// The llmp connection from the actual fuzzer to the process supervising it
-const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
 const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
 /// The llmp (2 way) connection from a fuzzer to the broker (broadcasting all other fuzzer messages)
 const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
@@ -358,7 +356,7 @@ mod tests {
     use crate::{
         StdFuzzer,
         corpus::{Corpus, InMemoryCorpus, Testcase},
-        events::llmp::restarting::_ENV_FUZZER_SENDER,
+        events::restarting::ENV_FUZZER_SENDER,
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
         fuzzer::Fuzzer,
@@ -450,12 +448,12 @@ mod tests {
         // # Safety
         // Single-threaded test code
         unsafe {
-            staterestorer.write_to_env(_ENV_FUZZER_SENDER).unwrap();
+            staterestorer.write_to_env(ENV_FUZZER_SENDER).unwrap();
         }
 
         compiler_fence(Ordering::SeqCst);
 
-        let sc_cpy = StateRestorer::from_env(&mut shmem_provider, _ENV_FUZZER_SENDER).unwrap();
+        let sc_cpy = StateRestorer::from_env(&mut shmem_provider, ENV_FUZZER_SENDER).unwrap();
         assert!(sc_cpy.has_content());
 
         let (mut state_clone, mgr_description) = staterestorer.restore().unwrap().unwrap();

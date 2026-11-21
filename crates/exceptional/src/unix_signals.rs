@@ -320,10 +320,10 @@ impl Signal {
     }
 }
 
-impl TryFrom<&str> for Signal {
-    type Error = Error;
+impl core::str::FromStr for Signal {
+    type Err = Error;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         Ok(match value {
             "SIGABRT" => Signal::SigAbort,
             "SIGBUS" => Signal::SigBus,
@@ -341,6 +341,14 @@ impl TryFrom<&str> for Signal {
             "SIGTRAP" => Signal::SigTrap,
             _ => return Err(Error::illegal_argument(format!("No signal named {value}"))),
         })
+    }
+}
+
+impl TryFrom<&str> for Signal {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        value.parse()
     }
 }
 

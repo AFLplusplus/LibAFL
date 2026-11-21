@@ -502,16 +502,11 @@ impl Allocator {
         let shadow_size = size >> 3;
         let buf = unsafe { core::slice::from_raw_parts_mut(shadow_addr as *mut u8, shadow_size) };
         let (prefix, aligned, suffix) = unsafe { buf.align_to::<u128>() };
-        if !prefix.iter().all(|&x| x == 0xff)
-            || !suffix.iter().all(|&x| x == 0xff)
-            || !aligned
+        prefix.iter().all(|&x| x == 0xff)
+            && suffix.iter().all(|&x| x == 0xff)
+            && aligned
                 .iter()
                 .all(|&x| x == 0xffffffffffffffffffffffffffffffffu128)
-        {
-            return false;
-        }
-
-        true
     }
     /// Checks whether the given address up till size is valid unpoisoned shadow memory.
     /// TODO: check edge cases
@@ -903,7 +898,7 @@ impl Default for Allocator {
 #[test]
 fn check_shadow() {
     use frida_gum::Gum;
-    let _gum = crate::tests::GUM.get_or_init(Gum::obtain);
+    crate::tests::GUM.get_or_init(Gum::obtain);
     let mut allocator = Allocator::default();
     allocator.init();
 

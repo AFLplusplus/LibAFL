@@ -62,7 +62,7 @@ use crate::{
 };
 
 /// The (internal) `env` that indicates we're running as client.
-const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
+const AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 
 /// The env variable to set in order to enable child output
 #[cfg(unix)]
@@ -761,7 +761,7 @@ where
         }
 
         // spawn logic
-        let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
+        let is_client = std::env::var(AFL_LAUNCHER_CLIENT);
 
         let mut handles = match is_client {
             Ok(core_conf) => {
@@ -778,7 +778,7 @@ where
                 // I am a broker
                 // before going to the broker loop, spawn n clients
 
-                if std::env::var(crate::events::restarting::_ENV_FUZZER_SENDER).is_ok() {
+                if std::env::var(crate::events::restarting::ENV_FUZZER_SENDER).is_ok() {
                     // We are the child of a restarting manager (e.g. the Broker child)
                     // We should not spawn clients again, but just run the broker logic
                     if self.spawn_broker {
@@ -850,7 +850,7 @@ where
                             let client_description =
                                 ClientDescription::new(index, overcommit_i, core_id);
                             let mut child = startable_self()?;
-                            child.env(_AFL_LAUNCHER_CLIENT, client_description.to_safe_string());
+                            child.env(AFL_LAUNCHER_CLIENT, client_description.to_safe_string());
                             let child = (if debug_output {
                                 &mut child
                             } else {
