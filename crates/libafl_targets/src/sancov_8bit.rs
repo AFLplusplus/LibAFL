@@ -44,27 +44,32 @@ pub unsafe fn extra_counters() -> Vec<OwnedMutSlice<'static, u8>> {
 /// # Safety
 /// Start and stop are being dereferenced.
 #[unsafe(no_mangle)]
-#[expect(clippy::cast_sign_loss)]
 pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop: *mut u8) {
+    if start.is_null() || stop.is_null() || start >= stop {
+        return;
+    }
     unsafe {
+        let start_addr = start as usize;
+        let stop_addr = stop as usize;
         let counters_maps = &mut *counters_maps_ptr_mut();
-        for existing in counters_maps {
-            let range = existing.as_mut_ptr()..=existing.as_mut_ptr().add(existing.len());
-            if range.contains(&start) || range.contains(&stop) {
-                // we have overlapping or touching ranges; merge them
-                let &start = range.start().min(&start);
-                let &stop = range.end().max(&stop);
-                *existing =
-                    OwnedMutSlice::from_raw_parts_mut(start, stop.offset_from(start) as usize);
+        for existing in counters_maps.iter() {
+            let existing_start = existing.as_ptr() as usize;
+            let existing_stop = existing_start.saturating_add(existing.len());
+            if start_addr >= existing_start && stop_addr <= existing_stop {
+                // Already covered by an existing registered module range.
                 return;
             }
         }
-
-        let counters_maps = &mut *counters_maps_ptr_mut();
-        // we didn't overlap; keep going
+        // Remove any strictly enclosed sub-ranges before registering the enclosing allocation,
+        // without ever merging merely adjacent DSO allocations across separate objects.
+        counters_maps.retain(|existing| {
+            let existing_start = existing.as_ptr() as usize;
+            let existing_stop = existing_start.saturating_add(existing.len());
+            !(start_addr <= existing_start && stop_addr >= existing_stop)
+        });
         counters_maps.push(OwnedMutSlice::from_raw_parts_mut(
             start,
-            stop.offset_from(start) as usize,
+            stop_addr - start_addr,
         ));
     }
 }
@@ -78,13 +83,18 @@ pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_init(start: *mut u8, stop
 /// Start and stop are being dereferenced.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __sanitizer_cov_8bit_counters_cleanup(start: *mut u8, stop: *mut u8) {
+    if start.is_null() || stop.is_null() || start >= stop {
+        return;
+    }
+    let start_addr = start as usize;
+    let stop_addr = stop as usize;
     unsafe {
         let counters_maps = &mut *counters_maps_ptr_mut();
         counters_maps.retain(|existing| {
-            let existing_start = existing.as_ptr().cast_mut();
-            let existing_stop = existing_start.add(existing.len());
+            let existing_start = existing.as_ptr() as usize;
+            let existing_stop = existing_start.saturating_add(existing.len());
             // keep every range that is not fully contained within the range being cleaned up
-            !(existing_start >= start && existing_stop <= stop)
+            !(existing_start >= start_addr && existing_stop <= stop_addr)
         });
     }
 }
@@ -99,8 +109,8 @@ mod observers {
         fmt::Debug,
         hash::{Hash, Hasher},
         iter::Flatten,
-        mem::size_of,
-        slice::{Iter, IterMut, from_raw_parts},
+        marker::PhantomData,
+        slice::{Iter, IterMut},
     };
 
     use libafl::{
@@ -139,19 +149,21 @@ mod observers {
     /// `SanitizerCoverage` instrumentation. This is unsafe, and data in the map may be mutated from
     /// under us at any time. It should never be assumed constant.
     pub unsafe fn counters_maps_observer(name: &'static str) -> CountersMultiMapObserver<false> {
-        CountersMultiMapObserver::new(name)
+        unsafe { CountersMultiMapObserver::new(name) }
     }
 
     /// The [`CountersMultiMapObserver`] observes all the counters that may be set by
     /// `SanitizerCoverage` in [`super::COUNTERS_MAPS`]
-    #[derive(Serialize, Deserialize, Debug, Clone)]
-    #[expect(clippy::unsafe_derive_deserialize)]
+    #[derive(Serialize, Deserialize, Debug)]
     pub struct CountersMultiMapObserver<const DIFFERENTIAL: bool> {
         intervals: IntervalTree<usize, usize>,
         len: usize,
         initial: u8,
         name: Cow<'static, str>,
-        iter_idx: usize,
+        #[serde(skip)]
+        active: bool,
+        #[serde(skip)]
+        phantom: PhantomData<*mut u8>,
     }
 
     impl<I, S> Observer<I, S> for CountersMultiMapObserver<false>
@@ -181,19 +193,17 @@ mod observers {
     impl<const DIFFERENTIAL: bool> HasLen for CountersMultiMapObserver<DIFFERENTIAL> {
         #[inline]
         fn len(&self) -> usize {
-            self.len
+            if self.active { self.len } else { 0 }
         }
     }
 
     impl<const DIFFERENTIAL: bool> Hash for CountersMultiMapObserver<DIFFERENTIAL> {
         fn hash<H: Hasher>(&self, hasher: &mut H) {
+            if !self.active {
+                return;
+            }
             for map in unsafe { &*counters_maps_ptr() } {
-                let slice = &**map;
-                let ptr = slice.as_ptr();
-                let map_size = slice.len() / size_of::<u8>();
-                unsafe {
-                    hasher.write(from_raw_parts(ptr, map_size));
-                }
+                hasher.write(map);
             }
         }
     }
@@ -215,6 +225,10 @@ mod observers {
 
         #[inline]
         fn get(&self, idx: usize) -> u8 {
+            assert!(
+                self.active,
+                "Deserialized CountersMultiMapObserver is detached from COUNTERS_MAPS"
+            );
             let elem = self.intervals.query(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
@@ -223,6 +237,10 @@ mod observers {
 
         #[inline]
         fn set(&mut self, idx: usize, val: u8) {
+            assert!(
+                self.active,
+                "Deserialized CountersMultiMapObserver is detached from COUNTERS_MAPS"
+            );
             let elem = self.intervals.query_mut(idx..=idx).next().unwrap();
             let i = elem.value;
             let j = idx - elem.interval.start;
@@ -235,6 +253,9 @@ mod observers {
         }
 
         fn count_bytes(&self) -> u64 {
+            if !self.active {
+                return 0;
+            }
             let initial = self.initial();
             let mut res = 0;
             for map in unsafe { &*counters_maps_ptr() } {
@@ -248,6 +269,11 @@ mod observers {
         }
 
         fn reset_map(&mut self) -> Result<(), Error> {
+            if !self.active {
+                return Err(Error::illegal_state(
+                    "Deserialized CountersMultiMapObserver cannot reset COUNTERS_MAPS",
+                ));
+            }
             let initial = self.initial();
             for map in unsafe { &mut *counters_maps_ptr_mut() } {
                 for x in &mut **map {
@@ -287,7 +313,7 @@ mod observers {
     impl<const DIFFERENTIAL: bool> CountersMultiMapObserver<DIFFERENTIAL> {
         /// Creates a new [`CountersMultiMapObserver`], maybe in differential mode
         #[must_use]
-        fn maybe_differential(name: &'static str) -> Self {
+        unsafe fn maybe_differential(name: &'static str) -> Self {
             let mut idx = 0;
             let mut intervals = IntervalTree::new();
             for (v, x) in unsafe { &*counters_maps_ptr() }.iter().enumerate() {
@@ -300,47 +326,40 @@ mod observers {
                 len: idx,
                 name: Cow::from(name),
                 initial: u8::default(),
-                iter_idx: 0,
+                active: true,
+                phantom: PhantomData,
             }
         }
     }
 
     impl CountersMultiMapObserver<true> {
-        /// Creates a new [`CountersMultiMapObserver`] in differential mode
+        /// Creates a new [`CountersMultiMapObserver`] in differential mode.
+        ///
+        /// # Safety
+        /// [`super::COUNTERS_MAPS`] must not be concurrently mutated or mutably aliased while used.
         #[must_use]
-        pub fn differential(name: &'static str) -> Self {
-            Self::maybe_differential(name)
+        pub unsafe fn differential(name: &'static str) -> Self {
+            unsafe { Self::maybe_differential(name) }
         }
     }
 
     impl CountersMultiMapObserver<false> {
-        /// Creates a new [`CountersMultiMapObserver`]
+        /// Creates a new [`CountersMultiMapObserver`].
+        ///
+        /// # Safety
+        /// [`super::COUNTERS_MAPS`] must not be concurrently mutated or mutably aliased while used.
         #[must_use]
-        pub fn new(name: &'static str) -> Self {
-            Self::maybe_differential(name)
+        pub unsafe fn new(name: &'static str) -> Self {
+            unsafe { Self::maybe_differential(name) }
         }
 
-        /// Creates a new [`CountersMultiMapObserver`] with an owned map
+        /// Creates a new [`CountersMultiMapObserver`] with an owned map.
+        ///
+        /// # Safety
+        /// [`super::COUNTERS_MAPS`] must not be concurrently mutated or mutably aliased while used.
         #[must_use]
-        pub fn owned(name: &'static str) -> Self {
-            let mut idx = 0;
-            let mut v = 0;
-            let mut intervals = IntervalTree::new();
-            unsafe { &mut *counters_maps_ptr_mut() }
-                .iter_mut()
-                .for_each(|m| {
-                    let l = m.len();
-                    intervals.insert(idx..(idx + l), v);
-                    idx += l;
-                    v += 1;
-                });
-            Self {
-                intervals,
-                len: idx,
-                name: Cow::from(name),
-                initial: u8::default(),
-                iter_idx: 0,
-            }
+        pub unsafe fn owned(name: &'static str) -> Self {
+            unsafe { Self::maybe_differential(name) }
         }
     }
 
@@ -350,6 +369,9 @@ mod observers {
         type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'static, u8>>>;
 
         fn as_iter(&'it self) -> Self::IntoIter {
+            if !self.active {
+                return [].iter().flatten();
+            }
             unsafe {
                 let counters_maps = &*counters_maps_ptr();
                 counters_maps.iter().flatten()
@@ -362,6 +384,9 @@ mod observers {
         type IntoIterMut = Flatten<IterMut<'it, OwnedMutSlice<'static, u8>>>;
 
         fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
+            if !self.active {
+                return [].iter_mut().flatten();
+            }
             unsafe {
                 let counters_maps = &mut *counters_maps_ptr_mut();
                 counters_maps.iter_mut().flatten()
@@ -374,6 +399,9 @@ mod observers {
         type IntoIter = Flatten<Iter<'it, OwnedMutSlice<'static, u8>>>;
 
         fn into_iter(self) -> Self::IntoIter {
+            if !self.active {
+                return [].iter().flatten();
+            }
             unsafe { &*counters_maps_ptr() }.iter().flatten()
         }
     }
@@ -385,6 +413,9 @@ mod observers {
         type IntoIter = Flatten<IterMut<'it, OwnedMutSlice<'static, u8>>>;
 
         fn into_iter(self) -> Self::IntoIter {
+            if !self.active {
+                return [].iter_mut().flatten();
+            }
             unsafe { &mut *counters_maps_ptr_mut() }
                 .iter_mut()
                 .flatten()
@@ -409,4 +440,43 @@ mod observers {
     }
 
     impl<OTA, OTB, I, S> DifferentialObserver<OTA, OTB, I, S> for CountersMultiMapObserver<true> {}
+}
+
+#[cfg(test)]
+mod tests {
+    use core::ptr;
+
+    use super::{
+        __sanitizer_cov_8bit_counters_cleanup, __sanitizer_cov_8bit_counters_init,
+        counters_maps_ptr,
+    };
+
+    #[test]
+    fn test_sancov_8bit_init_ignores_null_and_empty_ranges() {
+        let mut buf = [0u8; 16];
+        let base_count = unsafe { (&*counters_maps_ptr()).len() };
+
+        unsafe {
+            __sanitizer_cov_8bit_counters_init(ptr::null_mut(), ptr::null_mut());
+            __sanitizer_cov_8bit_counters_init(buf.as_mut_ptr(), buf.as_mut_ptr());
+            assert_eq!((&*counters_maps_ptr()).len(), base_count);
+
+            let start = buf.as_mut_ptr();
+            let mid = start.add(8);
+            let stop = start.add(buf.len());
+            __sanitizer_cov_8bit_counters_init(start, mid);
+            __sanitizer_cov_8bit_counters_init(mid, stop);
+            assert_eq!((&*counters_maps_ptr()).len(), base_count + 2);
+            __sanitizer_cov_8bit_counters_init(start, mid);
+            assert_eq!((&*counters_maps_ptr()).len(), base_count + 2);
+            __sanitizer_cov_8bit_counters_init(start, stop);
+            assert_eq!((&*counters_maps_ptr()).len(), base_count + 1);
+
+            __sanitizer_cov_8bit_counters_cleanup(ptr::null_mut(), ptr::null_mut());
+            assert_eq!((&*counters_maps_ptr()).len(), base_count + 1);
+
+            __sanitizer_cov_8bit_counters_cleanup(start, stop);
+            assert_eq!((&*counters_maps_ptr()).len(), base_count);
+        }
+    }
 }

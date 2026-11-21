@@ -142,7 +142,7 @@ pub extern "C" fn LLVMFuzzerRunDriver(
         let time_observer = TimeObserver::new("time");
 
         // Create the Cmp observer
-        let cmplog_observer = CmpLogObserver::new("cmplog", true);
+        let cmplog_observer = unsafe { CmpLogObserver::new("cmplog", true) };
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR

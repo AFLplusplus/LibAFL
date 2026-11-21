@@ -1,10 +1,7 @@
 //! Forkserver logic into targets
 
 use core::sync::atomic::{AtomicBool, Ordering};
-use std::{
-    os::fd::{AsFd, AsRawFd, BorrowedFd},
-    sync::OnceLock,
-};
+use std::sync::OnceLock;
 
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::executors::forkserver::FS_NEW_OPT_AUTODTCT;
@@ -29,91 +26,109 @@ use shmem_providers::{ShMem, ShMemId, ShMemProvider};
 use crate::cmps::EXTENDED_CMPLOG_MAP_PTR;
 #[cfg(feature = "cmplog")]
 use crate::cmps::{AflppCmpLogMap, CMPLOG_MAP_PTR};
-use crate::coverage::{__afl_map_size, EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR, SHM_FUZZING};
+use crate::{
+    EDGES_MAP_ALLOCATED_SIZE, EDGES_MAP_DEFAULT_SIZE,
+    coverage::{__afl_map_size, EDGES_MAP_PTR, INPUT_LENGTH_PTR, INPUT_PTR, SHM_FUZZING},
+};
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use crate::{
     coverage::{__token_start, __token_stop},
     has_autotokens,
 };
 
-/// SAFETY:
-///
-/// This fd will be closed after being forked as a child. Thus this fd shall never be
-/// used after that.
-const FORKSRV_R_FD: BorrowedFd<'static> = unsafe { BorrowedFd::borrow_raw(FORKSRV_FD) };
-/// SAFETY:
-///
-/// This fd will be closed after being forked as a child. Thus this fd shall never be
-/// used after that.
-const FORKSRV_W_FD: BorrowedFd<'static> = unsafe { BorrowedFd::borrow_raw(FORKSRV_FD + 1) };
+const FORKSRV_R_RAW_FD: libc::c_int = FORKSRV_FD;
+const FORKSRV_W_RAW_FD: libc::c_int = FORKSRV_FD + 1;
 
 fn fs_opt_set_error(error: i32) -> i32 {
     (error & 0xFFFF) << 8
 }
 
-fn write_to_forkserver(message: &[u8]) -> Result<(), Error> {
-    let bytes_written = nix::unistd::write(FORKSRV_W_FD, message)?;
-    if bytes_written != message.len() {
-        return Err(Error::illegal_state(format!(
-            "Could not write to target fd. Expected {} bytes, wrote {bytes_written} bytes",
-            message.len()
-        )));
+unsafe fn write_raw_fd(fd: libc::c_int, buf: &[u8]) -> Result<usize, Error> {
+    loop {
+        let ret = unsafe { libc::write(fd, buf.as_ptr().cast::<libc::c_void>(), buf.len()) };
+        if ret >= 0 {
+            #[expect(clippy::cast_sign_loss)]
+            return Ok(ret as usize);
+        }
+        let err = std::io::Error::last_os_error();
+        if err.raw_os_error() == Some(libc::EINTR) {
+            continue;
+        }
+        return Err(Error::os_error(err, "write to forkserver fd failed"));
+    }
+}
+
+unsafe fn read_raw_fd(fd: libc::c_int, buf: &mut [u8]) -> Result<usize, Error> {
+    loop {
+        let ret = unsafe { libc::read(fd, buf.as_mut_ptr().cast::<libc::c_void>(), buf.len()) };
+        if ret >= 0 {
+            #[expect(clippy::cast_sign_loss)]
+            return Ok(ret as usize);
+        }
+        let err = std::io::Error::last_os_error();
+        if err.raw_os_error() == Some(libc::EINTR) {
+            continue;
+        }
+        return Err(Error::os_error(err, "read from forkserver fd failed"));
+    }
+}
+
+unsafe fn write_all_to_fd(fd: libc::c_int, mut message: &[u8]) -> Result<(), Error> {
+    while !message.is_empty() {
+        let bytes_written = unsafe { write_raw_fd(fd, message)? };
+        if bytes_written == 0 {
+            return Err(Error::illegal_state(
+                "Could not write all bytes to target fd: write returned 0",
+            ));
+        }
+        message = &message[bytes_written..];
     }
     Ok(())
 }
-#[cfg(any(target_os = "linux", target_vendor = "apple"))]
-fn write_all_to_forkserver(message: &[u8]) -> Result<(), Error> {
-    let mut remain_len = message.len();
-    while remain_len > 0 {
-        let bytes_written = nix::unistd::write(FORKSRV_W_FD, message)?;
-        remain_len -= bytes_written;
-    }
-    Ok(())
+
+unsafe fn write_u32_to_forkserver(message: u32) -> Result<(), Error> {
+    unsafe { write_all_to_fd(FORKSRV_W_RAW_FD, &message.to_ne_bytes()) }
 }
-fn write_u32_to_forkserver(message: u32) -> Result<(), Error> {
-    write_to_forkserver(&message.to_ne_bytes())
-}
-fn write_error_to_forkserver(error: i32) -> Result<(), Error> {
-    if error == 0 || error > 0xFFFF {
+
+unsafe fn write_error_to_forkserver(error: i32) -> Result<(), Error> {
+    if error <= 0 || error > 0xFFFF {
         return Err(Error::illegal_argument("illegal error sent to forkserver"));
     }
     #[expect(clippy::cast_sign_loss)]
-    write_u32_to_forkserver((fs_opt_set_error(error) | FS_OPT_ERROR) as u32)
+    unsafe {
+        write_u32_to_forkserver((fs_opt_set_error(error) | FS_OPT_ERROR) as u32)
+    }
 }
 
-fn read_from_forkserver(message: &mut [u8]) -> Result<(), Error> {
-    let bytes_read = nix::unistd::read(FORKSRV_R_FD.as_fd(), message)?;
-    if bytes_read != message.len() {
-        return Err(Error::illegal_state(format!(
-            "Could not read from st pipe. Expected {} bytes, got {bytes_read} bytes",
-            message.len()
-        )));
+unsafe fn read_from_forkserver(mut message: &mut [u8]) -> Result<(), Error> {
+    while !message.is_empty() {
+        let bytes_read = unsafe { read_raw_fd(FORKSRV_R_RAW_FD, message)? };
+        if bytes_read == 0 {
+            return Err(Error::illegal_state("Unexpected EOF reading from forkserver"));
+        }
+        message = &mut message[bytes_read..];
     }
     Ok(())
 }
-fn read_u32_from_forkserver() -> Result<u32, Error> {
+
+unsafe fn read_u32_from_forkserver() -> Result<u32, Error> {
     let mut buf = [0u8; 4];
-    read_from_forkserver(&mut buf)?;
+    unsafe { read_from_forkserver(&mut buf)? };
     Ok(u32::from_ne_bytes(buf))
 }
 
-/// Consume current shared memory structure, and get the raw pointer to
-/// this shared memory.
-///
-/// Note that calling this method will result in a memory leak.
-fn shmem_into_raw<T: Sized>(shmem: impl ShMem) -> *mut T {
-    let mut manually_dropped = core::mem::ManuallyDrop::new(shmem);
-    manually_dropped.as_mut_ptr().cast()
+fn leak_shmem<T: Sized>(shmem: impl ShMem) -> *mut T {
+    core::mem::ManuallyDrop::new(shmem).as_mut_ptr().cast()
 }
 
-fn map_shared_memory_common<SHM: ShMemProvider>(
+unsafe fn map_shared_memory_common<SHM: ShMemProvider>(
     shmem_provider: &mut SHM,
     map_env_var: &str,
     map_size_env_var: &str,
     map_size_default_fallback: usize,
-) -> Result<*mut u8, Error> {
+) -> Result<SHM::ShMem, Error> {
     let Ok(id_str) = std::env::var(map_env_var) else {
-        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
+        unsafe { write_error_to_forkserver(FS_ERROR_SHM_OPEN)? };
         return Err(Error::illegal_argument(format!(
             "Error: shared memory variable {map_env_var} is not set"
         )));
@@ -125,10 +140,13 @@ fn map_shared_memory_common<SHM: ShMemProvider>(
     } else {
         map_size_default_fallback
     };
+    if map_size == 0 {
+        return Err(Error::illegal_argument(format!(
+            "Shared memory size for {map_env_var} must be greater than 0"
+        )));
+    }
 
-    let shmem = shmem_provider.shmem_from_id_and_size(ShMemId::from_string(&id_str), map_size)?;
-
-    Ok(shmem_into_raw(shmem))
+    shmem_provider.shmem_from_id_and_size(ShMemId::from_string(&id_str), map_size)
 }
 
 /// Guard [`map_shared_memory`] is invoked only once
@@ -139,18 +157,51 @@ static SHM_MAP_GUARD: OnceLock<()> = OnceLock::new();
 ///
 /// If anything failed, the forkserver will be notified with
 /// [`FS_ERROR_SHM_OPEN`].
-pub fn map_shared_memory<SHM: ShMemProvider>(shmem_provider: &mut SHM) -> Result<(), Error> {
+///
+/// # Safety
+/// Forkserver fd `FORKSRV_FD + 1` must not alias an unrelated open file, and no thread may
+/// concurrently access [`EDGES_MAP_PTR`].
+pub unsafe fn map_shared_memory<SHM: ShMemProvider>(shmem_provider: &mut SHM) -> Result<(), Error> {
     if SHM_MAP_GUARD.set(()).is_err() {
         return Err(Error::illegal_state("shared memory has been mapped before"));
     }
-    map_shared_memory_internal(shmem_provider)
+    unsafe { map_shared_memory_internal(shmem_provider) }
 }
 
-fn map_shared_memory_internal<SHM: ShMemProvider>(shmem_provider: &mut SHM) -> Result<(), Error> {
-    let target_ptr =
-        map_shared_memory_common(shmem_provider, SHM_ENV_VAR, AFL_MAP_SIZE_ENV_VAR, 65536)?;
+unsafe fn map_shared_memory_internal<SHM: ShMemProvider>(
+    shmem_provider: &mut SHM,
+) -> Result<(), Error> {
+    let raw_edges = unsafe {
+        core::sync::atomic::AtomicUsize::from_ptr(&raw mut crate::coverage::MAX_EDGES_FOUND)
+            .load(Ordering::Relaxed)
+    };
+    let clamped_edges = raw_edges.min(EDGES_MAP_ALLOCATED_SIZE);
+    let required_edges = if cfg!(any(
+        feature = "sancov_ngram4",
+        feature = "sancov_ngram8",
+        feature = "sancov_ctx"
+    )) {
+        clamped_edges.max(EDGES_MAP_DEFAULT_SIZE)
+    } else {
+        clamped_edges
+    };
+    let shmem = unsafe {
+        map_shared_memory_common(
+            shmem_provider,
+            SHM_ENV_VAR,
+            AFL_MAP_SIZE_ENV_VAR,
+            required_edges.max(EDGES_MAP_DEFAULT_SIZE),
+        )?
+    };
+    let mapped_len = shmem.len();
+    if mapped_len < required_edges {
+        return Err(Error::illegal_state(format!(
+            "Mapped coverage region ({mapped_len} bytes) is smaller than required guard count ({required_edges})"
+        )));
+    }
     unsafe {
-        EDGES_MAP_PTR = target_ptr;
+        core::sync::atomic::AtomicPtr::from_ptr(&raw mut EDGES_MAP_PTR)
+            .store(leak_shmem(shmem), Ordering::Release);
     }
     Ok(())
 }
@@ -163,26 +214,47 @@ static INPUT_SHM_MAP_GUARD: OnceLock<()> = OnceLock::new();
 ///
 /// If anything failed, the forkserver will be notified with
 /// [`FS_ERROR_SHM_OPEN`].
-pub fn map_input_shared_memory<SHM: ShMemProvider>(shmem_provider: &mut SHM) -> Result<(), Error> {
+///
+/// # Safety
+/// Forkserver fd `FORKSRV_FD + 1` must not alias an unrelated open file, and no thread may
+/// concurrently access [`INPUT_LENGTH_PTR`] or [`INPUT_PTR`].
+pub unsafe fn map_input_shared_memory<SHM: ShMemProvider>(
+    shmem_provider: &mut SHM,
+) -> Result<(), Error> {
     if INPUT_SHM_MAP_GUARD.set(()).is_err() {
         return Err(Error::illegal_state("shared memory has been mapped before"));
     }
-    map_input_shared_memory_internal(shmem_provider)
+    unsafe { map_input_shared_memory_internal(shmem_provider) }
 }
 
-fn map_input_shared_memory_internal<SHM: ShMemProvider>(
+unsafe fn map_input_shared_memory_internal<SHM: ShMemProvider>(
     shmem_provider: &mut SHM,
 ) -> Result<(), Error> {
-    let target_ptr = map_shared_memory_common(
-        shmem_provider,
-        SHM_FUZZ_ENV_VAR,
-        SHM_FUZZ_MAP_SIZE_ENV_VAR,
-        MAX_INPUT_SIZE_DEFAULT + SHMEM_FUZZ_HDR_SIZE,
-    )?;
-    let map: *mut u32 = target_ptr.cast();
+    let shmem = unsafe {
+        map_shared_memory_common(
+            shmem_provider,
+            SHM_FUZZ_ENV_VAR,
+            SHM_FUZZ_MAP_SIZE_ENV_VAR,
+            MAX_INPUT_SIZE_DEFAULT + SHMEM_FUZZ_HDR_SIZE,
+        )?
+    };
+    let mapped_len = shmem.len();
+    if mapped_len < SHMEM_FUZZ_HDR_SIZE {
+        return Err(Error::illegal_argument(format!(
+            "Shared memory input region ({mapped_len} bytes) is smaller than header ({SHMEM_FUZZ_HDR_SIZE} bytes)"
+        )));
+    }
+    if shmem.as_ptr_of::<u32>().is_none_or(|p| !p.is_aligned()) {
+        return Err(Error::illegal_state(
+            "Shared memory input region is not aligned for u32 length header",
+        ));
+    }
+    let map: *mut u32 = leak_shmem(shmem);
     unsafe {
-        INPUT_LENGTH_PTR = map;
-        INPUT_PTR = map.add(1).cast();
+        core::sync::atomic::AtomicPtr::from_ptr(&raw mut INPUT_LENGTH_PTR)
+            .store(map, Ordering::Release);
+        core::sync::atomic::AtomicPtr::from_ptr(&raw mut INPUT_PTR)
+            .store(map.add(1).cast(), Ordering::Release);
     }
     Ok(())
 }
@@ -196,34 +268,50 @@ static CMPLOG_SHM_MAP_GUARD: OnceLock<()> = OnceLock::new();
 ///
 /// If anything failed, the forkserver will be notified with
 /// [`FS_ERROR_SHM_OPEN`].
+///
+/// # Safety
+/// Forkserver fd `FORKSRV_FD + 1` must not alias an unrelated open file, and no thread may
+/// concurrently access [`CMPLOG_MAP_PTR`].
 #[cfg(feature = "cmplog")]
-pub fn map_cmplog_shared_memory<SHM: ShMemProvider>(shmem_provider: &mut SHM) -> Result<(), Error> {
+pub unsafe fn map_cmplog_shared_memory<SHM: ShMemProvider>(
+    shmem_provider: &mut SHM,
+) -> Result<(), Error> {
     if CMPLOG_SHM_MAP_GUARD.set(()).is_err() {
         return Err(Error::illegal_state("shared memory has been mapped before"));
     }
-    map_cmplog_shared_memory_internal(shmem_provider)
+    unsafe { map_cmplog_shared_memory_internal(shmem_provider) }
 }
 
 #[cfg(feature = "cmplog")]
-fn map_cmplog_shared_memory_internal<SHM: ShMemProvider>(
+unsafe fn map_cmplog_shared_memory_internal<SHM: ShMemProvider>(
     shmem_provider: &mut SHM,
 ) -> Result<(), Error> {
     let Ok(id_str) = std::env::var(SHM_CMPLOG_ENV_VAR) else {
-        write_error_to_forkserver(FS_ERROR_SHM_OPEN)?;
+        unsafe { write_error_to_forkserver(FS_ERROR_SHM_OPEN)? };
         return Err(Error::illegal_argument(format!(
             "Error: shared memory variable {SHM_CMPLOG_ENV_VAR} is not set"
         )));
     };
     let map_size = size_of::<AflppCmpLogMap>();
     let shmem = shmem_provider.shmem_from_id_and_size(ShMemId::from_string(&id_str), map_size)?;
-
-    let target_ptr = shmem_into_raw(shmem);
+    if shmem.len() < map_size
+        || shmem
+            .as_ptr_of::<crate::cmps::CmpLogMap>()
+            .is_none_or(|p| !p.is_aligned())
+    {
+        return Err(Error::illegal_state(
+            "Shared memory cmplog region is too small or unaligned",
+        ));
+    }
+    let target_ptr: *mut crate::cmps::CmpLogMap = leak_shmem(shmem);
     unsafe {
-        CMPLOG_MAP_PTR = target_ptr;
+        core::sync::atomic::AtomicPtr::from_ptr(&raw mut CMPLOG_MAP_PTR)
+            .store(target_ptr, Ordering::Release);
     }
     #[cfg(feature = "cmplog_extended_instrumentation")]
     unsafe {
-        EXTENDED_CMPLOG_MAP_PTR = target_ptr;
+        core::sync::atomic::AtomicPtr::from_ptr(&raw mut EXTENDED_CMPLOG_MAP_PTR)
+            .store(target_ptr.cast::<AflppCmpLogMap>(), Ordering::Release);
     }
     Ok(())
 }
@@ -233,7 +321,10 @@ pub trait ForkserverParent {
     /// Conduct initializing routine before fuzzing loop.
     ///
     /// Usually, several signal handlers are registered in this function.
-    fn pre_fuzzing(&mut self) -> Result<(), Error>;
+    ///
+    /// # Safety
+    /// Implementations typically replace process-wide OS signal handlers (`SIGCHLD`, `SIGTERM`).
+    unsafe fn pre_fuzzing(&mut self) -> Result<(), Error>;
 
     /// Spawn a child after the forkserver is ready.
     ///
@@ -242,7 +333,10 @@ pub trait ForkserverParent {
     ///
     /// The actual forking should be conduct in this function, and in persistent mode,
     /// some tricks can be done to "fool" the forkserver that a child has been spawned.
-    fn spawn_child(&mut self, was_killed: bool) -> Result<ForkResult, Error>;
+    ///
+    /// # Safety
+    /// Implementations invoke `fork()`, so the calling process must be single-threaded when spawning a child.
+    unsafe fn spawn_child(&mut self, was_killed: bool) -> Result<ForkResult, Error>;
 
     /// Interact with spawned child until the child has done its part.
     ///
@@ -287,7 +381,7 @@ impl MaybePersistentForkserverParent {
 }
 
 impl ForkserverParent for MaybePersistentForkserverParent {
-    fn pre_fuzzing(&mut self) -> Result<(), Error> {
+    unsafe fn pre_fuzzing(&mut self) -> Result<(), Error> {
         self.is_persistent = std::env::var("__AFL_PERSISTENT").is_ok_and(|v| v == "1");
         let old_sigchld_handler =
             (unsafe { nix::sys::signal::signal(Signal::SIGCHLD, SigHandler::SigDfl) })
@@ -306,7 +400,7 @@ impl ForkserverParent for MaybePersistentForkserverParent {
         Ok(())
     }
 
-    fn spawn_child(&mut self, was_killed: bool) -> Result<ForkResult, Error> {
+    unsafe fn spawn_child(&mut self, was_killed: bool) -> Result<ForkResult, Error> {
         if STOP_SOON.load(Ordering::Relaxed) {
             if let Some(child_pid) = self.last_child_pid.take() {
                 nix::sys::signal::kill(Pid::from_raw(child_pid), Signal::SIGKILL)?;
@@ -416,31 +510,42 @@ static FORKSERVER_GUARD: OnceLock<()> = OnceLock::new();
 /// Before invoking this function, you should initialize [`EDGES_MAP_PTR`],
 /// [`INPUT_PTR`] and [`INPUT_LENGTH_PTR`] properly. [`map_shared_memory`] and
 /// [`map_input_shared_memory`] can be used, for example.
-pub fn start_forkserver<P: ForkserverParent>(
+///
+/// # Safety
+///
+/// The caller must ensure the process is single-threaded prior to forking, that file descriptors
+/// `FORKSRV_FD` and `FORKSRV_FD + 1` are either closed or exclusively dedicated to the AFL
+/// forkserver control/status pipes (never owned by Rust `OwnedFd`/`File` handles), and that
+/// [`EDGES_MAP_PTR`], [`INPUT_PTR`], and [`INPUT_LENGTH_PTR`] have been validly initialized.
+pub unsafe fn start_forkserver<P: ForkserverParent>(
     forkserver_parent: &mut P,
 ) -> Result<ForkserverState, Error> {
     if FORKSERVER_GUARD.set(()).is_err() {
         return Err(Error::illegal_state("forkserver has been started before"));
     }
-    start_forkserver_internal(forkserver_parent)
+    unsafe { start_forkserver_internal(forkserver_parent) }
 }
 
 const VERSION: u32 = 0x41464c00 + FS_NEW_VERSION_MAX;
-fn start_forkserver_internal<P: ForkserverParent>(
+unsafe fn start_forkserver_internal<P: ForkserverParent>(
     forkserver_parent: &mut P,
 ) -> Result<ForkserverState, Error> {
     #[cfg(any(target_os = "linux", target_vendor = "apple"))]
     let autotokens_on = has_autotokens();
-    let sharedmem_fuzzing = unsafe { SHM_FUZZING == 1 };
+    let sharedmem_fuzzing = unsafe {
+        core::sync::atomic::AtomicU32::from_ptr((&raw mut SHM_FUZZING).cast::<u32>())
+            .load(Ordering::Acquire)
+            == 1
+    };
 
     // Parent supports testcases via shared map - and the user wants to use it. Tell AFL.
     // Phone home and tell the parent that we're OK. If parent isn't there, assume we're
     // not running in forkserver mode and just execute program.
-    if write_u32_to_forkserver(VERSION).is_err() {
+    if unsafe { write_u32_to_forkserver(VERSION) }.is_err() {
         return Ok(ForkserverState::NoAfl);
     }
 
-    let reply = read_u32_from_forkserver()?;
+    let reply = unsafe { read_u32_from_forkserver()? };
     if reply != VERSION ^ 0xFFFFFFFF {
         return Err(Error::illegal_state(
             "wrong forkserver message from AFL++ tool",
@@ -456,51 +561,67 @@ fn start_forkserver_internal<P: ForkserverParent>(
         status |= FS_NEW_OPT_AUTODTCT;
     }
     #[expect(clippy::cast_sign_loss)]
-    write_u32_to_forkserver(status as u32)?;
+    unsafe {
+        write_u32_to_forkserver(status as u32)?;
+    }
 
     // Now send the parameters for the set options, increasing by option number
 
     // FS_NEW_OPT_MAPSIZE - we always send the map size
-    write_u32_to_forkserver(unsafe { __afl_map_size as u32 })?;
+    let map_size = u32::try_from(unsafe {
+        core::sync::atomic::AtomicUsize::from_ptr(&raw mut __afl_map_size).load(Ordering::Acquire)
+    })
+    .map_err(|_| Error::illegal_state("__afl_map_size exceeds u32::MAX"))?;
+    unsafe { write_u32_to_forkserver(map_size)? };
 
     // FS_NEW_OPT_AUTODICT - send autotokens
     #[cfg(any(target_os = "linux", target_vendor = "apple"))]
     if autotokens_on {
-        #[expect(clippy::cast_sign_loss)]
-        let tokens_len = unsafe { __token_stop.offset_from(__token_start) } as u32;
-        write_u32_to_forkserver(tokens_len).inspect_err(|_| {
+        let tokens_len_usize = unsafe { (__token_stop as usize) - (__token_start as usize) };
+        let tokens_len = u32::try_from(tokens_len_usize)
+            .map_err(|_| Error::illegal_state("autotokens section exceeds u32::MAX"))?;
+        unsafe { write_u32_to_forkserver(tokens_len) }.inspect_err(|_| {
             log::error!("Error: could not send autotokens len");
         })?;
-        write_all_to_forkserver(unsafe {
-            core::slice::from_raw_parts(__token_start, tokens_len as usize)
-        })
+        unsafe {
+            write_all_to_fd(
+                FORKSRV_W_RAW_FD,
+                core::slice::from_raw_parts(__token_start, tokens_len as usize),
+            )
+        }
         .inspect_err(|_| {
             log::error!("could not send autotokens");
         })?;
     }
 
     // send welcome message as final message
-    write_u32_to_forkserver(VERSION)?;
+    unsafe { write_u32_to_forkserver(VERSION)? };
 
-    forkserver_parent.pre_fuzzing()?;
+    unsafe { forkserver_parent.pre_fuzzing()? };
 
     loop {
         // Wait for parent by reading from the pipe. Abort if read fails.
 
-        let was_killed = read_u32_from_forkserver()?;
+        let was_killed = unsafe { read_u32_from_forkserver()? };
 
-        let fork_result = forkserver_parent.spawn_child(was_killed != 0)?;
+        let fork_result = unsafe { forkserver_parent.spawn_child(was_killed != 0)? };
 
         match fork_result {
             ForkResult::Child => {
                 // FORKSRV_FD is for communication with AFL, we don't need it in the child
-                let _ = nix::unistd::close(FORKSRV_R_FD.as_raw_fd());
-                let _ = nix::unistd::close(FORKSRV_W_FD.as_raw_fd());
+                unsafe {
+                    if libc::close(FORKSRV_R_RAW_FD) < 0 {
+                        log::debug!("Failed to close FORKSRV_R_RAW_FD in child");
+                    }
+                    if libc::close(FORKSRV_W_RAW_FD) < 0 {
+                        log::debug!("Failed to close FORKSRV_W_RAW_FD in child");
+                    }
+                }
                 return Ok(ForkserverState::Child);
             }
             ForkResult::Parent(child_pid) => {
                 #[expect(clippy::cast_sign_loss)]
-                write_u32_to_forkserver(child_pid.pid as u32).inspect_err(|_| {
+                unsafe { write_u32_to_forkserver(child_pid.pid as u32) }.inspect_err(|_| {
                     log::error!("write to afl-fuzz");
                 })?;
             }
@@ -510,7 +631,7 @@ fn start_forkserver_internal<P: ForkserverParent>(
 
         // Relay wait status to AFL pipe, then loop back.
         #[expect(clippy::cast_sign_loss)]
-        write_u32_to_forkserver(status as u32).inspect_err(|_| {
+        unsafe { write_u32_to_forkserver(status as u32) }.inspect_err(|_| {
             log::error!("writing to afl-fuzz");
         })?;
     }
@@ -518,15 +639,51 @@ fn start_forkserver_internal<P: ForkserverParent>(
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec::Vec;
+
     use super::*;
 
     #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_write_all_to_fd_advances_slice_completely() {
+        let mut fds: [libc::c_int; 2] = [0; 2];
+        assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
+        let payload: Vec<u8> = (0u8..=255).cycle().take(131_072).collect();
+        let read_fd = fds[0];
+        let write_fd = fds[1];
+        let expected = payload.clone();
+
+        let reader = std::thread::spawn(move || {
+            let mut out = Vec::with_capacity(131_072);
+            let mut chunk = [0u8; 4096];
+            loop {
+                let n = unsafe { read_raw_fd(read_fd, &mut chunk).unwrap() };
+                if n == 0 {
+                    break;
+                }
+                out.extend_from_slice(&chunk[..n]);
+            }
+            assert_eq!(unsafe { libc::close(read_fd) }, 0);
+            out
+        });
+
+        unsafe {
+            write_all_to_fd(write_fd, &payload).unwrap();
+            assert_eq!(libc::close(write_fd), 0);
+        }
+
+        assert_eq!(reader.join().unwrap(), expected);
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
     fn test_maybe_persistent_forkserver_parent_persistent_mode() {
         unsafe { std::env::set_var("__AFL_PERSISTENT", "1") };
         let mut parent = MaybePersistentForkserverParent::new();
-        parent.pre_fuzzing().unwrap();
+        unsafe { parent.pre_fuzzing().unwrap() };
+        unsafe { std::env::remove_var("__AFL_PERSISTENT") };
 
-        let result = parent.spawn_child(false).unwrap();
+        let result = unsafe { parent.spawn_child(false).unwrap() };
 
         let first_pid = match result {
             ForkResult::Child => {
@@ -542,7 +699,7 @@ mod tests {
             "handle_child_requests should detect stopped child in persistent mode"
         );
 
-        let result2 = parent.spawn_child(false).unwrap();
+        let result2 = unsafe { parent.spawn_child(false).unwrap() };
         match result2 {
             ForkResult::Parent(handle2) => {
                 assert_eq!(

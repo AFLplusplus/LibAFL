@@ -4,7 +4,7 @@ pub use observers::*;
 
 /// cmp related stages
 pub mod stages;
-use alloc::{alloc::alloc_zeroed, boxed::Box, vec::Vec};
+use alloc::{alloc::alloc_zeroed, boxed::Box};
 use core::{
     alloc::Layout,
     fmt::{self, Debug, Formatter},
@@ -43,11 +43,7 @@ pub const CMPLOG_KIND_RTN: u8 = 1;
 
 // EXTERNS, GLOBALS
 
-#[cfg(any(
-    feature = "cmplog",
-    feature = "sancov_cmplog",
-    feature = "sancov_value_profile"
-))]
+#[cfg(feature = "cmplog")]
 // void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t size, uint64_t arg1, uint64_t arg2)
 unsafe extern "C" {
     /// Logs an instruction for feedback during fuzzing
@@ -67,11 +63,16 @@ unsafe extern "C" {
         len: usize,
     );
 
+    /// Cmplog string routines with a maximum byte length.
+    pub fn __libafl_targets_cmplog_routines_strn(
+        k: usize,
+        ptr1: *const u8,
+        ptr2: *const u8,
+        len: usize,
+    );
+
     /// Pointer to the `CmpLog` map
     pub static mut libafl_cmplog_map_ptr: *mut CmpLogMap;
-
-    /// Pointer to the extended `CmpLog` map
-    pub static mut libafl_cmplog_map_extended_ptr: *mut CmpLogMap;
 }
 
 #[cfg(feature = "cmplog_extended_instrumentation")]
@@ -85,6 +86,8 @@ unsafe extern "C" {
         ptr2: *const u8,
         len: usize,
     );
+    /// Pointer to the extended `CmpLog` map
+    pub static mut libafl_cmplog_map_extended_ptr: *mut AflppCmpLogMap;
 }
 
 #[cfg(feature = "cmplog_extended_instrumentation")]
@@ -414,19 +417,18 @@ impl CmpMap for CmpLogMap {
                         self.vals.operands[idx][execution].1 as u16,
                         self.vals.operands[idx][execution].2 == 1,
                     ))),
-                    3 => Some(CmpValues::U32((
+                    2..=3 => Some(CmpValues::U32((
                         self.vals.operands[idx][execution].0 as u32,
                         self.vals.operands[idx][execution].1 as u32,
                         self.vals.operands[idx][execution].2 == 1,
                     ))),
-                    7 => Some(CmpValues::U64((
+                    4..=7 => Some(CmpValues::U64((
                         self.vals.operands[idx][execution].0,
                         self.vals.operands[idx][execution].1,
                         self.vals.operands[idx][execution].2 == 1,
                     ))),
-                    // TODO handle 128 bits & 256 bits & 512 bits cmps
-                    15 | 31 | 63 => None,
-                    _ => panic!("Invalid CmpLog shape {shape}"),
+                    // Wider comparison shapes (e.g. 128/256/512-bit) are ignored.
+                    _ => None,
                 }
             }
         } else {
@@ -460,36 +462,12 @@ impl CmpMap for CmpLogMap {
 /// The global `CmpLog` map for the current `LibAFL` run.
 #[unsafe(no_mangle)]
 #[allow(non_upper_case_globals)] // expect breaks here for some reason
-pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
-    headers: [CmpLogHeader {
-        hits: 0,
-        shape: 0,
-        kind: 0,
-    }; CMPLOG_MAP_W],
-    vals: CmpLogVals {
-        operands: [[CmpLogInstruction(0, 0, 0); CMPLOG_MAP_H]; CMPLOG_MAP_W],
-    },
-};
+pub static mut libafl_cmplog_map: CmpLogMap = unsafe { zeroed() };
 
 /// The globale `CmpLog` map, aflpp style
 #[unsafe(no_mangle)]
 #[cfg(feature = "cmplog_extended_instrumentation")]
-pub static mut libafl_cmplog_map_extended: AflppCmpLogMap = AflppCmpLogMap {
-    headers: [AflppCmpLogHeader::new_with_raw_value(0); CMPLOG_MAP_W],
-    vals: AflppCmpLogVals {
-        operands: [[AflppCmpLogOperands {
-            v0: 0,
-            v0_128: 0,
-            v0_256_0: 0,
-            v0_256_1: 0,
-            v1: 0,
-            v1_128: 0,
-            v1_256_0: 0,
-            v1_256_1: 0,
-            unused: [0; 8],
-        }; CMPLOG_MAP_H]; CMPLOG_MAP_W],
-    },
-};
+pub static mut libafl_cmplog_map_extended: AflppCmpLogMap = unsafe { zeroed() };
 
 pub use libafl_cmplog_map as CMPLOG_MAP;
 #[cfg(feature = "cmplog_extended_instrumentation")]
@@ -513,23 +491,32 @@ impl AflppCmpLogMap {
     /// Returns a new [`OwnedRefMut`] to an [`AflppCmpLogMap`], pointing to the given [`ShMem`].
     ///
     /// # Panics
-    /// Panics if the given shared mem is too small
+    /// Panics if the given shared mem is too small or unaligned for [`AflppCmpLogMap`].
     ///
     /// # Safety
     /// The shared memory needs to start with a valid [`AflppCmpLogMap`] object.
     /// Any use of this [`OwnedRefMut`] will dereference a pointer to the given shared memory accordingly
     pub unsafe fn from_shmem<SHM: ShMem>(shmem: &mut SHM) -> OwnedRefMut<'_, Self> {
-        unsafe { OwnedRefMut::from_mut_ptr(shmem.as_mut_ptr_of().unwrap()) }
+        let ptr = shmem
+            .as_mut_ptr_of::<Self>()
+            .filter(|p| p.is_aligned())
+            .expect("Shared memory is too small or unaligned for AflppCmpLogMap");
+        unsafe { OwnedRefMut::from_mut_ptr(ptr) }
     }
 
     #[must_use]
-    #[expect(clippy::cast_ptr_alignment)]
     /// Instantiate a new boxed zeroed `AflppCmpLogMap`. This should be used to create a new
     /// map, because it is so large it cannot be allocated on the stack with default
     /// runtime configuration.
     pub fn boxed() -> Box<Self> {
+        let layout = Layout::new::<AflppCmpLogMap>();
         unsafe {
-            Box::from_raw(alloc_zeroed(Layout::new::<AflppCmpLogMap>()) as *mut AflppCmpLogMap)
+            let raw = alloc_zeroed(layout);
+            if raw.is_null() {
+                alloc::alloc::handle_alloc_error(layout);
+            }
+            #[expect(clippy::cast_ptr_alignment)]
+            Box::from_raw(raw.cast::<AflppCmpLogMap>())
         }
     }
 
@@ -569,14 +556,76 @@ impl Serialize for AflppCmpLogMap {
 }
 
 impl<'de> Deserialize<'de> for AflppCmpLogMap {
-    #[expect(clippy::cast_ptr_alignment)]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let bytes = Vec::<u8>::deserialize(deserializer)?;
-        let map: Self = unsafe { ptr::read(bytes.as_ptr() as *const _) };
-        Ok(map)
+        let mut boxed = Self::boxed();
+        Self::deserialize_in_place(deserializer, &mut boxed)?;
+        Ok(*boxed)
+    }
+
+    fn deserialize_in_place<D>(deserializer: D, place: &mut Self) -> Result<(), D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct InPlaceVisitor<'a>(&'a mut AflppCmpLogMap);
+
+        impl<'de> serde::de::Visitor<'de> for InPlaceVisitor<'_> {
+            type Value = ();
+
+            fn expecting(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+                write!(
+                    formatter,
+                    "a byte array of length {}",
+                    size_of::<AflppCmpLogMap>()
+                )
+            }
+
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if v.len() != size_of::<AflppCmpLogMap>() {
+                    return Err(E::invalid_length(v.len(), &self));
+                }
+                // SAFETY: `v` has exact length `size_of::<AflppCmpLogMap>()` and does not overlap `self.0`.
+                unsafe {
+                    ptr::copy_nonoverlapping(
+                        v.as_ptr(),
+                        ptr::from_mut(self.0).cast::<u8>(),
+                        size_of::<AflppCmpLogMap>(),
+                    );
+                }
+                Ok(())
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let dst = unsafe {
+                    slice::from_raw_parts_mut(
+                        ptr::from_mut(self.0).cast::<u8>(),
+                        size_of::<AflppCmpLogMap>(),
+                    )
+                };
+                for (idx, slot) in dst.iter_mut().enumerate() {
+                    *slot = seq
+                        .next_element()?
+                        .ok_or_else(|| serde::de::Error::invalid_length(idx, &self))?;
+                }
+                if seq.next_element::<u8>()?.is_some() {
+                    return Err(serde::de::Error::invalid_length(
+                        size_of::<AflppCmpLogMap>() + 1,
+                        &self,
+                    ));
+                }
+                Ok(())
+            }
+        }
+
+        deserializer.deserialize_bytes(InPlaceVisitor(place))
     }
 }
 
@@ -596,10 +645,10 @@ impl CmpMap for AflppCmpLogMap {
             } else {
                 CMPLOG_MAP_H
             }
-        } else if self.executions_for(idx) < CMPLOG_MAP_RTN_H {
+        } else if self.executions_for(idx) < CMPLOG_MAP_RTN_EXTENDED_H {
             self.executions_for(idx)
         } else {
-            CMPLOG_MAP_RTN_H
+            CMPLOG_MAP_RTN_EXTENDED_H
         }
     }
 
@@ -636,8 +685,10 @@ impl CmpMap for AflppCmpLogMap {
             }
         } else {
             unsafe {
-                let v0_len = self.vals.fn_operands[idx][execution].v0_len & (0x80 - 1);
-                let v1_len = self.vals.fn_operands[idx][execution].v1_len & (0x80 - 1);
+                let v0_len = (self.vals.fn_operands[idx][execution].v0_len & 0x7f)
+                    .min(CMPLOG_RTN_LEN as u8);
+                let v1_len = (self.vals.fn_operands[idx][execution].v1_len & 0x7f)
+                    .min(CMPLOG_RTN_LEN as u8);
                 Some(CmpValues::Bytes((
                     CmplogBytes::from_buf_and_len(self.vals.fn_operands[idx][execution].v0, v0_len),
                     CmplogBytes::from_buf_and_len(self.vals.fn_operands[idx][execution].v1, v1_len),
@@ -651,5 +702,112 @@ impl CmpMap for AflppCmpLogMap {
         self.headers.fill(AflppCmpLogHeader::new_with_raw_value(0));
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use alloc::{string::ToString, vec};
+    #[cfg(all(feature = "cmplog", not(miri)))]
+    use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+
+    #[cfg(all(feature = "cmplog", not(miri)))]
+    use libafl::observers::CmpMap;
+    use serde::Deserialize;
+
+    use super::{AflppCmpLogMap, AflppCmpLogOperands, ptr, size_of, slice};
+
+    #[cfg(all(feature = "cmplog", not(miri)))]
+    static CMPLOG_TEST_LOCK: AtomicBool = AtomicBool::new(false);
+
+    #[cfg(all(feature = "cmplog", not(miri)))]
+    pub(crate) struct CmplogTestGuard;
+
+    #[cfg(all(feature = "cmplog", not(miri)))]
+    impl Drop for CmplogTestGuard {
+        fn drop(&mut self) {
+            CMPLOG_TEST_LOCK.store(false, Ordering::Release);
+        }
+    }
+
+    #[cfg(all(feature = "cmplog", not(miri)))]
+    pub(crate) fn lock_cmplog_test() -> CmplogTestGuard {
+        while CMPLOG_TEST_LOCK
+            .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
+            core::hint::spin_loop();
+        }
+        CmplogTestGuard
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_aflpp_cmplog_map_boxed_and_deserialize_bounds() {
+        let mut boxed = AflppCmpLogMap::boxed();
+        boxed.values_mut().operands_mut()[0][0] = AflppCmpLogOperands::new(0x1122, 0x3344);
+        assert_eq!(boxed.values().operands()[0][0].v0(), 0x1122);
+        assert_eq!(boxed.values().operands()[0][0].v1(), 0x3344);
+
+        let short_deser =
+            serde::de::value::BytesDeserializer::<serde::de::value::Error>::new(&[0u8; 16]);
+        let err = AflppCmpLogMap::deserialize_in_place(short_deser, &mut *boxed).unwrap_err();
+        assert!(err.to_string().contains("invalid length 16"));
+
+        let mut words = vec![0u64; size_of::<AflppCmpLogMap>().div_ceil(8) + 1];
+        let unaligned = unsafe {
+            slice::from_raw_parts_mut(
+                words.as_mut_ptr().cast::<u8>().add(1),
+                size_of::<AflppCmpLogMap>(),
+            )
+        };
+        unsafe {
+            ptr::copy_nonoverlapping(
+                ptr::from_ref(&*boxed).cast::<u8>(),
+                unaligned.as_mut_ptr(),
+                size_of::<AflppCmpLogMap>(),
+            );
+        }
+        boxed.values_mut().operands_mut()[0][0] = AflppCmpLogOperands::new(0, 0);
+        let deser = serde::de::value::BytesDeserializer::<serde::de::value::Error>::new(unaligned);
+        AflppCmpLogMap::deserialize_in_place(deser, &mut *boxed).unwrap();
+        assert_eq!(boxed.values().operands()[0][0].v0(), 0x1122);
+        assert_eq!(boxed.values().operands()[0][0].v1(), 0x3344);
+    }
+
+    #[test]
+    #[cfg(all(feature = "cmplog", not(miri)))]
+    fn test_cmplog_routines_hit_wrap_no_oob() {
+        use crate::{
+            __libafl_targets_cmplog_routines, __libafl_targets_cmplog_routines_len, CMPLOG_ENABLED,
+            CMPLOG_MAP_RTN_H, CMPLOG_MAP_W, cmps::CMPLOG_MAP_PTR,
+        };
+
+        let _guard = lock_cmplog_test();
+        let lhs = [b'A'; 32];
+        let rhs = [b'B'; 32];
+        unsafe {
+            let map = CMPLOG_MAP_PTR;
+            assert!(!map.is_null());
+            (*map).reset().unwrap();
+            AtomicU8::from_ptr(&raw mut CMPLOG_ENABLED).store(1, Ordering::Relaxed);
+
+            for _ in 0..40 {
+                __libafl_targets_cmplog_routines(CMPLOG_MAP_W - 1, lhs.as_ptr(), rhs.as_ptr());
+            }
+            __libafl_targets_cmplog_routines_len(
+                CMPLOG_MAP_W - 1,
+                lhs.as_ptr(),
+                rhs.as_ptr(),
+                usize::MAX / 2,
+            );
+            AtomicU8::from_ptr(&raw mut CMPLOG_ENABLED).store(0, Ordering::Relaxed);
+
+            assert_eq!((*map).headers[CMPLOG_MAP_W - 1].hits, 41);
+            let wrapped_slot = 40 % CMPLOG_MAP_RTN_H;
+            assert_eq!((*map).vals.routines[CMPLOG_MAP_W - 1][wrapped_slot].0, lhs);
+            assert_eq!((*map).vals.routines[CMPLOG_MAP_W - 1][wrapped_slot].1, rhs);
+            (*map).reset().unwrap();
+        }
     }
 }

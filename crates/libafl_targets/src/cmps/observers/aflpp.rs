@@ -62,9 +62,21 @@ struct cmp_map {
 };
 */
 
+fn deserialize_owned_aflpp_cmp_map<'de, D>(
+    de: D,
+) -> Result<OwnedRefMut<'static, AflppCmpLogMap>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let mut boxed = AflppCmpLogMap::boxed();
+    AflppCmpLogMap::deserialize_in_place(de, &mut boxed)?;
+    Ok(OwnedRefMut::Owned(boxed))
+}
+
 /// A [`CmpObserver`] observer for AFL++ redqueen
 #[derive(Serialize, Deserialize, Debug)]
 pub struct AflppCmpLogObserver<'a> {
+    #[serde(deserialize_with = "deserialize_owned_aflpp_cmp_map")]
     cmp_map: OwnedRefMut<'a, AflppCmpLogMap>,
     size: Option<OwnedRefMut<'a, usize>>,
     name: Cow<'static, str>,
@@ -97,6 +109,7 @@ where
     S: HasMetadata,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        self.cmp_map.as_mut().reset()?;
         #[cfg(feature = "cmplog_extended_instrumentation")]
         unsafe {
             // if the target is compiled with aflpp and you are running forkserver then this is not needed
@@ -105,16 +118,17 @@ where
             // however if it is in-process, then cmplog instrumentation is in the same binary as the edge-cov binary
             // (so we only have one executable)
             // therefore we need to turn this thing on and off to change this according to what executors we are using
-            CMPLOG_ENABLED = 1;
+            core::sync::atomic::AtomicU8::from_ptr(&raw mut CMPLOG_ENABLED)
+                .store(1, core::sync::atomic::Ordering::Relaxed);
         }
-        self.cmp_map.as_mut().reset()?;
         Ok(())
     }
 
     fn post_exec(&mut self, state: &mut S, _input: &I, _exit_kind: &ExitKind) -> Result<(), Error> {
         #[cfg(feature = "cmplog_extended_instrumentation")]
         unsafe {
-            CMPLOG_ENABLED = 0;
+            core::sync::atomic::AtomicU8::from_ptr(&raw mut CMPLOG_ENABLED)
+                .store(0, core::sync::atomic::Ordering::Relaxed);
         }
         if self.add_meta {
             self.add_cmpvalues_meta(state);

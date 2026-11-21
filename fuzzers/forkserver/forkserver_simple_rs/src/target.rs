@@ -53,21 +53,23 @@ fn main() {
     let mut shm_provider = StdShMemProvider::new().unwrap();
 
     // Map the coverage map shared memory set up by the fuzzer.
-    map_shared_memory(&mut shm_provider).unwrap();
+    unsafe { map_shared_memory(&mut shm_provider) }.unwrap();
 
     #[cfg(feature = "shared_input_mem")]
     {
         // SHM_FUZZING tells the forkserver parent that we can receive inputs
         // via shared memory instead of stdin. The parent will write the input
         // into the shared memory region and signal us to process it.
-        unsafe { SHM_FUZZING = 1 };
-        map_input_shared_memory(&mut shm_provider).unwrap();
+        unsafe {
+            SHM_FUZZING = 1;
+            map_input_shared_memory(&mut shm_provider).unwrap();
+        }
     }
 
     // `MaybePersistentForkserverParent` supports both one-shot and persistent
     // forkserver modes. In persistent mode, the child is resumed via SIGCONT
     // instead of being re-forked for each input.
-    match start_forkserver(&mut MaybePersistentForkserverParent::new()).unwrap() {
+    match unsafe { start_forkserver(&mut MaybePersistentForkserverParent::new()) }.unwrap() {
         ForkserverState::Child if is_persistent() => loop {
             process_input(read_input());
             // SIGSTOP tells the parent we're done with this input

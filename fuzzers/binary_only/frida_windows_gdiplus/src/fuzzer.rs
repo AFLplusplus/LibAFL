@@ -347,7 +347,7 @@ unsafe fn fuzz(options: &FuzzerOptions) -> Result<(), Error> {
 
                 println!("Cmplog observer is enabled");
                 // Create an observation channel using cmplog map
-                let cmplog_observer = CmpLogObserver::new("cmplog", true);
+                let cmplog_observer = unsafe { CmpLogObserver::new("cmplog", true) };
 
                 let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 

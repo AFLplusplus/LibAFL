@@ -64,7 +64,7 @@ pub(crate) fn has_autotokens() -> bool {
     unsafe {
         !__token_start.is_null()
             && !__token_stop.is_null()
-            && __token_stop.offset_from(__token_start) != 0
+            && (__token_stop as usize) > (__token_start as usize)
     }
 }
 
@@ -184,10 +184,12 @@ where
 pub fn edges_map_mut_ptr() -> *mut u8 {
     unsafe {
         if cfg!(feature = "pointer_maps") {
-            assert!(!EDGES_MAP_PTR.is_null());
-            EDGES_MAP_PTR
+            let ptr = core::sync::atomic::AtomicPtr::from_ptr(&raw mut EDGES_MAP_PTR)
+                .load(core::sync::atomic::Ordering::Acquire);
+            assert!(!ptr.is_null());
+            ptr
         } else {
-            &raw mut EDGES_MAP as *mut u8
+            (&raw mut EDGES_MAP).cast::<u8>()
         }
     }
 }
@@ -202,20 +204,23 @@ pub fn edges_map_mut_ptr() -> *mut u8 {
 ))]
 #[must_use]
 pub fn edges_max_num() -> usize {
-    unsafe {
-        if MAX_EDGES_FOUND > 0 {
-            MAX_EDGES_FOUND
-        } else {
-            #[cfg(feature = "pointer_maps")]
-            {
-                EDGES_MAP_ALLOCATED_SIZE // the upper bound
-            }
-            #[cfg(not(feature = "pointer_maps"))]
-            {
-                let edges_map_ptr = &raw const EDGES_MAP;
-                (*edges_map_ptr).len()
-            }
-        }
+    let max_edges = unsafe {
+        core::sync::atomic::AtomicUsize::from_ptr(&raw mut MAX_EDGES_FOUND)
+            .load(core::sync::atomic::Ordering::Relaxed)
+    };
+    let clamped = if max_edges > 0 {
+        max_edges.min(EDGES_MAP_ALLOCATED_SIZE)
+    } else {
+        EDGES_MAP_ALLOCATED_SIZE
+    };
+    if cfg!(any(
+        feature = "sancov_ngram4",
+        feature = "sancov_ngram8",
+        feature = "sancov_ctx"
+    )) {
+        clamped.max(EDGES_MAP_DEFAULT_SIZE)
+    } else {
+        clamped
     }
 }
 
@@ -225,7 +230,7 @@ pub use swap::*;
 #[cfg(feature = "pointer_maps")]
 mod swap {
     use alloc::borrow::Cow;
-    use core::fmt::Debug;
+    use core::{fmt::Debug, ptr::NonNull};
 
     use libafl::{
         Error,
@@ -239,7 +244,6 @@ mod swap {
     /// Observer to be used with `DiffExecutor`s when executing a differential target that shares
     /// the AFL map in order to swap out the maps (and thus allow for map observing the two targets
     /// separately).
-    #[expect(clippy::unsafe_derive_deserialize)]
     #[derive(Debug, Serialize, Deserialize)]
     pub struct DifferentialAFLMapSwapObserver<'a, 'b> {
         first_map: OwnedMutSlice<'a, u8>,
@@ -247,26 +251,52 @@ mod swap {
         first_name: Cow<'static, str>,
         second_name: Cow<'static, str>,
         name: Cow<'static, str>,
+        #[serde(skip)]
+        first_ptr: Option<NonNull<u8>>,
+        #[serde(skip)]
+        second_ptr: Option<NonNull<u8>>,
     }
 
     impl<'a, 'b> DifferentialAFLMapSwapObserver<'a, 'b> {
         /// Create a new `DifferentialAFLMapSwapObserver`.
-        pub fn new<const D1: bool, const D2: bool>(
+        ///
+        /// # Safety
+        ///
+        /// `first` and `second` maps must outlive this observer and cover all instrumented guards
+        /// without concurrent mutable aliasing while `EDGES_MAP_PTR` points to them.
+        pub unsafe fn new<const D1: bool, const D2: bool>(
             first: &mut StdMapObserver<'a, u8, D1>,
             second: &mut StdMapObserver<'b, u8, D2>,
         ) -> Self {
+            let first_name = first.name().clone();
+            let second_name = second.name().clone();
+            let name = Cow::from(format!("differential_{first_name}_{second_name}"));
+            let (first_map, first_ptr) = unsafe {
+                let slice = first.map_mut();
+                let ptr = slice.as_mut_ptr();
+                let len = slice.len();
+                (
+                    OwnedMutSlice::from_raw_parts_mut(ptr, len),
+                    (!slice.is_empty()).then(|| NonNull::new(ptr)).flatten(),
+                )
+            };
+            let (second_map, second_ptr) = unsafe {
+                let slice = second.map_mut();
+                let ptr = slice.as_mut_ptr();
+                let len = slice.len();
+                (
+                    OwnedMutSlice::from_raw_parts_mut(ptr, len),
+                    (!slice.is_empty()).then(|| NonNull::new(ptr)).flatten(),
+                )
+            };
             Self {
-                first_name: first.name().clone(),
-                second_name: second.name().clone(),
-                name: Cow::from(format!("differential_{}_{}", first.name(), second.name())),
-                first_map: unsafe {
-                    let slice = first.map_mut();
-                    OwnedMutSlice::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
-                },
-                second_map: unsafe {
-                    let slice = second.map_mut();
-                    OwnedMutSlice::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
-                },
+                first_map,
+                second_map,
+                first_name,
+                second_name,
+                name,
+                first_ptr,
+                second_ptr,
             }
         }
 
@@ -307,19 +337,100 @@ mod swap {
         for DifferentialAFLMapSwapObserver<'_, '_>
     {
         fn pre_observe_first(&mut self, _: &mut OTA) -> Result<(), Error> {
-            let slice = &mut self.first_map;
+            let Some(ptr) = self.first_ptr else {
+                return Err(Error::illegal_state(
+                    "Deserialized DifferentialAFLMapSwapObserver cannot update EDGES_MAP_PTR",
+                ));
+            };
             unsafe {
-                EDGES_MAP_PTR = slice.as_mut_ptr();
+                core::sync::atomic::AtomicPtr::from_ptr(&raw mut EDGES_MAP_PTR)
+                    .store(ptr.as_ptr(), core::sync::atomic::Ordering::Relaxed);
             }
             Ok(())
         }
 
         fn pre_observe_second(&mut self, _: &mut OTB) -> Result<(), Error> {
-            let slice = &mut self.second_map;
+            let Some(ptr) = self.second_ptr else {
+                return Err(Error::illegal_state(
+                    "Deserialized DifferentialAFLMapSwapObserver cannot update EDGES_MAP_PTR",
+                ));
+            };
             unsafe {
-                EDGES_MAP_PTR = slice.as_mut_ptr();
+                core::sync::atomic::AtomicPtr::from_ptr(&raw mut EDGES_MAP_PTR)
+                    .store(ptr.as_ptr(), core::sync::atomic::Ordering::Relaxed);
             }
             Ok(())
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use core::sync::atomic::{AtomicPtr, Ordering};
+
+        use super::*;
+
+        struct RestoreEdgesPtr(*mut u8);
+
+        impl Drop for RestoreEdgesPtr {
+            fn drop(&mut self) {
+                unsafe {
+                    AtomicPtr::from_ptr(&raw mut EDGES_MAP_PTR).store(self.0, Ordering::Relaxed);
+                }
+            }
+        }
+
+        #[test]
+        #[cfg_attr(miri, ignore)]
+        fn test_differential_afl_map_swap_observer_swaps_and_rejects_deserialized() {
+            let _restore = RestoreEdgesPtr(unsafe {
+                AtomicPtr::from_ptr(&raw mut EDGES_MAP_PTR).load(Ordering::Relaxed)
+            });
+            let mut buf1 = [0u8; 64];
+            let mut buf2 = [0u8; 64];
+            let ptr1 = buf1.as_mut_ptr();
+            let ptr2 = buf2.as_mut_ptr();
+
+            let mut obs1 = unsafe { StdMapObserver::from_mut_ptr("m1", ptr1, buf1.len()) };
+            let mut obs2 = unsafe { StdMapObserver::from_mut_ptr("m2", ptr2, buf2.len()) };
+            let mut diff = unsafe { DifferentialAFLMapSwapObserver::new(&mut obs1, &mut obs2) };
+
+            <DifferentialAFLMapSwapObserver as DifferentialObserver<(), (), (), ()>>::pre_observe_first(
+                &mut diff,
+                &mut (),
+            )
+            .unwrap();
+            assert_eq!(
+                unsafe { AtomicPtr::from_ptr(&raw mut EDGES_MAP_PTR).load(Ordering::Relaxed) },
+                ptr1
+            );
+
+            <DifferentialAFLMapSwapObserver as DifferentialObserver<(), (), (), ()>>::pre_observe_second(
+                &mut diff,
+                &mut (),
+            )
+            .unwrap();
+            assert_eq!(
+                unsafe { AtomicPtr::from_ptr(&raw mut EDGES_MAP_PTR).load(Ordering::Relaxed) },
+                ptr2
+            );
+
+            let encoded = postcard::to_allocvec(&diff).unwrap();
+            let mut roundtripped: DifferentialAFLMapSwapObserver =
+                postcard::from_bytes(&encoded).unwrap();
+            assert!(
+                <DifferentialAFLMapSwapObserver as DifferentialObserver<(), (), (), ()>>::pre_observe_first(
+                    &mut roundtripped,
+                    &mut (),
+                )
+                .is_err()
+            );
+            assert!(
+                <DifferentialAFLMapSwapObserver as DifferentialObserver<(), (), (), ()>>::pre_observe_second(
+                    &mut roundtripped,
+                    &mut (),
+                )
+                .is_err()
+            );
         }
     }
 }

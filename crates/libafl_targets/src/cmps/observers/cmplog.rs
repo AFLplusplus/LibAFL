@@ -50,14 +50,16 @@ where
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.map.as_mut().reset()?;
         unsafe {
-            CMPLOG_ENABLED = 1;
+            core::sync::atomic::AtomicU8::from_ptr(&raw mut CMPLOG_ENABLED)
+                .store(1, core::sync::atomic::Ordering::Relaxed);
         }
         Ok(())
     }
 
     fn post_exec(&mut self, state: &mut S, _input: &I, _exit_kind: &ExitKind) -> Result<(), Error> {
         unsafe {
-            CMPLOG_ENABLED = 0;
+            core::sync::atomic::AtomicU8::from_ptr(&raw mut CMPLOG_ENABLED)
+                .store(0, core::sync::atomic::Ordering::Relaxed);
         }
 
         if self.add_meta {
@@ -85,6 +87,7 @@ impl CmpLogObserver {
     /// Will keep a ptr to the map. The map may not move in memory!
     #[must_use]
     pub unsafe fn with_map_ptr(name: &'static str, map: *mut CmpLogMap, add_meta: bool) -> Self {
+        assert!(!map.is_null(), "CmpLogObserver map pointer must not be null");
         Self {
             name: Cow::from(name),
             size: None,
@@ -94,10 +97,17 @@ impl CmpLogObserver {
     }
 
     #[cfg(feature = "cmplog")]
-    /// Creates a new [`CmpLogObserver`] with the given name from the default cmplog map
+    /// Creates a new [`CmpLogObserver`] with the given name from the default cmplog map.
+    ///
+    /// # Safety
+    /// [`libafl_cmplog_map_ptr`] must point to a valid, unaliased [`CmpLogMap`].
     #[must_use]
-    pub fn new(name: &'static str, add_meta: bool) -> Self {
-        unsafe { Self::with_map_ptr(name, libafl_cmplog_map_ptr, add_meta) }
+    pub unsafe fn new(name: &'static str, add_meta: bool) -> Self {
+        let ptr = unsafe {
+            core::sync::atomic::AtomicPtr::from_ptr(&raw mut libafl_cmplog_map_ptr)
+                .load(core::sync::atomic::Ordering::Acquire)
+        };
+        unsafe { Self::with_map_ptr(name, ptr, add_meta) }
     }
 
     // TODO with_size

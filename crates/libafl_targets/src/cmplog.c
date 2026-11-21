@@ -54,56 +54,58 @@ CmpLogMapExtended *libafl_cmplog_map_extended_ptr = &libafl_cmplog_map_extended;
 // If it is mapped as X-only, we have a problem, so maybe we should add a check
 // to avoid to call it on .text addresses
 static inline long area_is_valid(const void *ptr, size_t len) {
-  if (!ptr || __asan_region_is_poisoned(ptr, len)) { return 0; }
+  if (!ptr || len == 0) { return 0; }
 
-  long valid_len;
+  const uint8_t *poisoned =
+      (const uint8_t *)__asan_region_is_poisoned((void *)ptr, len);
+  if (poisoned) {
+    if (poisoned <= (const uint8_t *)ptr) { return 0; }
+    len = (size_t)(poisoned - (const uint8_t *)ptr);
+  }
 
 #if defined(_WIN32)
-  valid_len = (long)len;
+  return (long)len;
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
-  if (!dymmy_initialized) {
-    if ((dummy_fd[1] = open("/dev/urandom", O_WRONLY)) < 0) {
-      if (pipe(dummy_fd) < 0) { dummy_fd[1] = 1; }
+  static size_t page_size = 0;
+  if (unlikely(!page_size)) {
+    long ps = sysconf(_SC_PAGE_SIZE);
+    page_size = ps > 0 ? (size_t)ps : 4096;
+  }
+  if (unlikely(!dymmy_initialized)) {
+    if ((dummy_fd[1] = open("/dev/urandom", O_WRONLY | O_CLOEXEC)) < 0) {
+      if (pipe(dummy_fd) < 0) { dummy_fd[1] = -1; }
     }
     dymmy_initialized = 1;
   }
+  if (unlikely(dummy_fd[1] < 0)) { return 0; }
 
-  valid_len = write(dummy_fd[1], ptr, len);
-
-  if (valid_len <= 0 || valid_len > (long)len) { return 0; }
-#endif
-
-  // even if the write succeed this can be a false positive if we cross
-  // a page boundary. who knows why.
-
-  char *p = (char *)ptr;
-#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
-  long page_size = sysconf(_SC_PAGE_SIZE);
-#else
-  long page_size = 4096;  // Yolo
-#endif
-  char *page = (char *)((uintptr_t)p & ~(page_size - 1)) + page_size;
-
-  if (page > p + len) {
-    // no, not crossing a page boundary
-    return valid_len;
-  } else {
-    // yes it crosses a boundary, hence we can only return the length of
-    // rest of the first page, we cannot detect if the next page is valid
-    // or not, neither by SYS_write nor msync() :-(
-    return (long)(page - p);
+  uintptr_t addr = (uintptr_t)ptr;
+  size_t    page_rem = page_size - (addr & (page_size - 1));
+  size_t    first = MIN(len, page_rem);
+  long      valid = write(dummy_fd[1], ptr, first);
+  if (valid <= 0 || (size_t)valid > first) { return 0; }
+  if ((size_t)valid == first && len > first && UINTPTR_MAX - addr >= first) {
+    size_t rest = len - first;
+    long   next = write(dummy_fd[1], (const uint8_t *)ptr + first, rest);
+    if (next > 0 && (size_t)next <= rest) { valid += next; }
   }
+  return valid;
+#else
+  return (long)len;
+#endif
 }
 
 // Very generic cmplog instructions callback
 void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t size,
                                           uint64_t arg1, uint64_t arg2) {
+  k &= CMPLOG_MAP_W - 1;
   cmplog_instructions_checked(k, size, arg1, arg2, 0);
 }
 
 // Very generic afl++ style cmplog instructions callback
 void __libafl_targets_cmplog_instructions_extended(uintptr_t k, uint8_t size,
   uint64_t arg1, uint64_t arg2) {
+  k &= CMPLOG_MAP_W - 1;
   cmplog_instructions_checked_extended(k, size, arg1, arg2, 0);
 }
 
@@ -119,24 +121,42 @@ void __libafl_targets_cmplog_routines(uintptr_t k, const uint8_t *ptr1,
   }
   int len = MIN(l1, l2);
 
+  k &= CMPLOG_MAP_W - 1;
   cmplog_routines_checked(k, ptr1, ptr2, len);
 }
 
 // cmplog routines but with len specified
 void __libafl_targets_cmplog_routines_len(uintptr_t k, const uint8_t *ptr1,
                                           const uint8_t *ptr2, size_t len) {
-  if (!libafl_cmplog_enabled) { return; }
+  if (!libafl_cmplog_enabled || len == 0) { return; }
+  if (len > CMPLOG_RTN_LEN) { len = CMPLOG_RTN_LEN; }
 
-  if (area_is_valid(ptr1, len) <= 0 ||
-      area_is_valid(ptr2, len) <= 0) {
-    return;
-  }
+  long l1 = area_is_valid(ptr1, len);
+  long l2 = area_is_valid(ptr2, len);
+  if (l1 <= 0 || l2 <= 0) { return; }
 
-  if (len >= CMPLOG_RTN_LEN) {
-    len = CMPLOG_RTN_LEN - 1;
-  }
+  k &= CMPLOG_MAP_W - 1;
+  cmplog_routines_checked(k, ptr1, ptr2, (size_t)MIN(l1, l2));
+}
 
-  cmplog_routines_checked(k, ptr1, ptr2, len);
+void __libafl_targets_cmplog_routines_strn(uintptr_t k, const uint8_t *ptr1,
+                                           const uint8_t *ptr2, size_t len) {
+  if (!libafl_cmplog_enabled || len == 0) { return; }
+  if (len > CMPLOG_RTN_LEN) { len = CMPLOG_RTN_LEN; }
+
+  long l1 = area_is_valid(ptr1, len);
+  long l2 = area_is_valid(ptr2, len);
+  if (l1 <= 0 || l2 <= 0) { return; }
+
+  size_t valid = (size_t)MIN(l1, l2);
+  size_t n1 = strnlen((const char *)ptr1, (size_t)l1);
+  size_t n2 = strnlen((const char *)ptr2, (size_t)l2);
+  size_t copy_len = (n1 == (size_t)l1 && n2 == (size_t)l2)
+                        ? valid
+                        : MIN(valid, MAX(n1, n2) + 1);
+
+  k &= CMPLOG_MAP_W - 1;
+  cmplog_routines_checked(k, ptr1, ptr2, copy_len);
 }
 
 void __libafl_targets_cmplog_routines_extended(uintptr_t k, const uint8_t *ptr1,
@@ -150,23 +170,21 @@ void __libafl_targets_cmplog_routines_extended(uintptr_t k, const uint8_t *ptr1,
   }
   int len = MIN(l1, l2);
 
+  k &= CMPLOG_MAP_W - 1;
   cmplog_routines_checked_extended(k, ptr1, ptr2, len);
 }
 
 void __libafl_targets_cmplog_routines_extended_len(uintptr_t k, const uint8_t *ptr1,
                                                    const uint8_t *ptr2, size_t len) {
-  if (!libafl_cmplog_enabled) { return; }
+  if (!libafl_cmplog_enabled || len == 0) { return; }
+  if (len > CMPLOG_RTN_LEN) { len = CMPLOG_RTN_LEN; }
 
-  if ((area_is_valid(ptr1, len)) <= 0 ||
-      (area_is_valid(ptr2, len)) <= 0) {
-    return;
-  }
+  long l1 = area_is_valid(ptr1, len);
+  long l2 = area_is_valid(ptr2, len);
+  if (l1 <= 0 || l2 <= 0) { return; }
 
-  if (len >= CMPLOG_RTN_LEN) {
-    len = CMPLOG_RTN_LEN - 1;
-  }
-
-  cmplog_routines_checked_extended(k, ptr1, ptr2, len);
+  k &= CMPLOG_MAP_W - 1;
+  cmplog_routines_checked_extended(k, ptr1, ptr2, (size_t)MIN(l1, l2));
 }
 
 /*

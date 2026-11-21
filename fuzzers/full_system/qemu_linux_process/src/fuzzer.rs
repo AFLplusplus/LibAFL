@@ -159,7 +159,7 @@ pub fn fuzz() {
         let time_observer = TimeObserver::new("time");
 
         // Create a cmplog observer
-        let cmplog_observer = CmpLogObserver::new("cmplog", true);
+        let cmplog_observer = unsafe { CmpLogObserver::new("cmplog", true) };
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR

@@ -63,7 +63,11 @@ fn main() {
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
 
     assert!(edges_map_default_size <= edges_map_allocated_size);
+    assert!(u32::try_from(edges_map_allocated_size).is_ok());
     assert!(edges_map_default_size.is_power_of_two());
+    assert!(cmp_map_size.is_power_of_two());
+    assert!(cmplog_map_w.is_power_of_two());
+    assert!(cmplog_map_h.is_power_of_two() && cmplog_map_h >= 4);
 
     write!(
         constants_file,
@@ -120,8 +124,9 @@ fn main() {
 
         let mut sancov_cmp = cc::Build::new();
 
-        #[cfg(unix)]
-        sancov_cmp.flag("-Wno-sign-compare");
+        if env::var("CARGO_CFG_TARGET_FAMILY").as_deref() == Ok("unix") {
+            sancov_cmp.flag("-Wno-sign-compare");
+        }
 
         #[cfg(feature = "sancov_value_profile")]
         {
@@ -224,44 +229,26 @@ fn main() {
         println!("cargo:rerun-if-changed=src/cmplog.h");
         println!("cargo:rerun-if-changed=src/cmplog.c");
 
-        #[cfg(unix)]
+        let mut cmplog = cc::Build::new();
+
+        #[cfg(feature = "cmplog_extended_instrumentation")]
+        cmplog.define("CMPLOG_EXTENDED", Some("1"));
+
+        #[cfg(feature = "whole_archive")]
         {
-            let mut cmplog = cc::Build::new();
-
-            #[cfg(feature = "cmplog_extended_instrumentation")]
-            cmplog.define("CMPLOG_EXTENDED", Some("1"));
-
-            #[cfg(feature = "whole_archive")]
-            {
-                cmplog.link_lib_modifier("+whole-archive");
-            }
-
-            cmplog
-                .flag("-Wno-pointer-sign") // UNIX ONLY FLAGS
-                .flag("-Wno-sign-compare")
-                .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-                .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
-                .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-                .file(src_dir.join("cmplog.c"))
-                .compile("cmplog");
+            cmplog.link_lib_modifier("+whole-archive");
         }
 
-        #[cfg(not(unix))]
-        {
-            let mut cmplog = cc::Build::new();
-
-            #[cfg(feature = "whole_archive")]
-            {
-                cmplog.link_lib_modifier("+whole-archive");
-            }
-
-            cmplog
-                .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
-                .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
-                .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
-                .file(src_dir.join("cmplog.c"))
-                .compile("cmplog");
+        if env::var("CARGO_CFG_TARGET_FAMILY").as_deref() == Ok("unix") {
+            cmplog.flag("-Wno-pointer-sign").flag("-Wno-sign-compare");
         }
+
+        cmplog
+            .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
+            .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
+            .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
+            .file(src_dir.join("cmplog.c"))
+            .compile("cmplog");
     }
 
     #[cfg(feature = "windows_asan")]

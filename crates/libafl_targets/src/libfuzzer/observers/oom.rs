@@ -33,13 +33,18 @@ static MALLOC_SIZE: AtomicUsize = AtomicUsize::new(0);
 /// Is only safe to call with valid freshly allocated pointers backed by allocations of `size`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __sanitizer_malloc_hook(ptr: *const c_void, size: usize) {
+    if ptr.is_null() {
+        return;
+    }
     if RUNNING.load(Ordering::Relaxed) {
         let size = match unsafe { libafl_check_malloc_size(ptr) } {
             0 => size, // either the malloc size function didn't work or it's really zero-sized
             real => real,
         };
 
-        let total = MALLOC_SIZE.fetch_add(size, Ordering::Relaxed) + size;
+        let total = MALLOC_SIZE
+            .fetch_add(size, Ordering::Relaxed)
+            .saturating_add(size);
         if (size > MALLOC_MAX.load(Ordering::Relaxed) || total > RSS_MAX.load(Ordering::Relaxed))
             && !OOMED.swap(true, Ordering::Relaxed)
         {
@@ -59,6 +64,9 @@ pub unsafe extern "C" fn __sanitizer_malloc_hook(ptr: *const c_void, size: usize
 #[allow(deprecated)] // `try_update` is unavailable on our MSRV.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __sanitizer_free_hook(ptr: *const c_void) {
+    if ptr.is_null() {
+        return;
+    }
     if RUNNING.load(Ordering::Relaxed) {
         let size = unsafe { libafl_check_malloc_size(ptr) };
         MALLOC_SIZE

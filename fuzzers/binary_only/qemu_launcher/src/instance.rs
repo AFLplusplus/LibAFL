@@ -309,7 +309,7 @@ where
             )?;
 
             // Create an observation channel using cmplog map
-            let cmplog_observer = CmpLogObserver::new("cmplog", true);
+            let cmplog_observer = unsafe { CmpLogObserver::new("cmplog", true) };
 
             let mut shadow_executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 

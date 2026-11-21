@@ -16,10 +16,10 @@ use libafl::{
     random_corpus_id_with_disabled,
     state::{HasCorpus, HasMaxSize, HasRand},
 };
-use libafl_core::{Error, HasLen, Named};
+use libafl_core::{Error, Named};
 
 unsafe extern "C" {
-    fn libafl_targets_has_libfuzzer_custom_mutator() -> bool;
+    fn libafl_targets_has_libfuzzer_custom_mutator() -> core::ffi::c_int;
     fn libafl_targets_libfuzzer_custom_mutator(
         data: *mut u8,
         size: usize,
@@ -27,7 +27,7 @@ unsafe extern "C" {
         seed: u32,
     ) -> usize;
 
-    fn libafl_targets_has_libfuzzer_custom_crossover() -> bool;
+    fn libafl_targets_has_libfuzzer_custom_crossover() -> core::ffi::c_int;
     fn libafl_targets_libfuzzer_custom_crossover(
         data1: *const u8,
         size1: usize,
@@ -42,13 +42,13 @@ unsafe extern "C" {
 /// Detect the presence of a user-defined custom mutator
 #[must_use]
 pub fn has_custom_mutator() -> bool {
-    unsafe { libafl_targets_has_libfuzzer_custom_mutator() }
+    unsafe { libafl_targets_has_libfuzzer_custom_mutator() != 0 }
 }
 
 /// Detect the presence of a user-defined custom crossover
 #[must_use]
 pub fn has_custom_crossover() -> bool {
-    unsafe { libafl_targets_has_libfuzzer_custom_crossover() }
+    unsafe { libafl_targets_has_libfuzzer_custom_crossover() != 0 }
 }
 
 /// Erased mutator for dynamic mutator access by the custom mutator/crossover
@@ -64,9 +64,16 @@ thread_local! {
 
 /// Mutator which is available for user-defined mutator/crossover
 /// See: [Structure-Aware Fuzzing with libFuzzer](https://github.com/google/fuzzing/blob/master/docs/structure-aware-fuzzing.md)
+///
+/// # Safety
+/// If `max_size > 0`, `data` must be non-null and valid for reads of `size.min(max_size)` bytes
+/// and writes of `max_size` bytes within a single live allocation for the duration of the call.
 #[allow(non_snake_case)] // expect breaks here for some reason
 #[unsafe(no_mangle)]
-pub extern "C" fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
+pub unsafe extern "C" fn LLVMFuzzerMutate(data: *mut u8, size: usize, max_size: usize) -> usize {
+    if data.is_null() || max_size == 0 {
+        return 0;
+    }
     MUTATOR.with(|mutator| {
         if let Ok(mut mutator) = mutator.try_borrow_mut()
             && let Some(mutator) = &mut *mutator
@@ -155,42 +162,40 @@ where
     S: HasMaxSize,
 {
     fn mutate(&self, data: *mut u8, size: usize, max_size: usize) -> usize {
-        let mut new_size = 0; // if access fails, the new len is zero
+        let clamped_size = size.min(max_size);
+        let mut new_size = 0;
         (self.accessor)(&mut |state| {
             if let Some(mutator) = self.mutator.upgrade()
                 && let Ok(mut mutator) = mutator.try_borrow_mut()
             {
                 let mut intermediary =
-                    BytesInput::from(unsafe { core::slice::from_raw_parts(data, size) });
+                    BytesInput::from(unsafe { core::slice::from_raw_parts(data, clamped_size) });
                 let old = state.max_size();
                 state.set_max_size(max_size);
                 let res = mutator.scheduled_mutate(state, &mut intermediary);
                 state.set_max_size(old);
                 let succeeded = res.is_ok();
 
-                let mut result = self.result.deref().borrow_mut();
-                *result = res;
-                drop(result);
+                *self.result.deref().borrow_mut() = res;
 
                 if succeeded {
                     let target = intermediary.mutator_bytes();
                     if target.len() > max_size {
-                        self.result
-                            .replace(Err(Error::illegal_state("Mutation result was too long!")))
-                            .ok();
+                        *self.result.borrow_mut() =
+                            Err(Error::illegal_state("Mutation result was too long!"));
                     } else {
-                        let actual = unsafe { core::slice::from_raw_parts_mut(data, max_size) };
-                        actual[..target.len()].copy_from_slice(target);
+                        // `data[clamped_size..max_size]` may be uninitialized in C callers.
+                        unsafe {
+                            core::ptr::copy_nonoverlapping(target.as_ptr(), data, target.len());
+                        }
                         new_size = target.len();
                     }
                 }
                 return;
             }
-            self.result
-                .replace(Err(Error::illegal_state(
-                    "Couldn't borrow mutator while mutating!",
-                )))
-                .ok();
+            *self.result.borrow_mut() = Err(Error::illegal_state(
+                "Couldn't borrow mutator while mutating!",
+            ));
         });
         new_size
     }
@@ -215,7 +220,7 @@ impl<S, SM> LLVMCustomMutator<S, SM, false> {
     /// Will create the specified libfuzzer custom mutator `mutate` fn.
     /// Only safe if the custom mutator implementation is correct.
     pub unsafe fn mutate(mutator: SM) -> Result<Self, Error> {
-        if unsafe { libafl_targets_has_libfuzzer_custom_mutator() } {
+        if has_custom_mutator() {
             Ok(unsafe { Self::mutate_unchecked(mutator) })
         } else {
             Err(Error::illegal_state(
@@ -244,7 +249,7 @@ impl<S, SM> LLVMCustomMutator<S, SM, true> {
     /// Will create the specified libfuzzer custom crossover mutator.
     /// Only safe if the custom mutator crossover implementation is correct.
     pub unsafe fn crossover(mutator: SM) -> Result<Self, Error> {
-        if unsafe { libafl_targets_has_libfuzzer_custom_crossover() } {
+        if has_custom_crossover() {
             Ok(unsafe { Self::crossover_unchecked(mutator) })
         } else {
             Err(Error::illegal_state(
@@ -332,9 +337,12 @@ where
         state: &mut S,
         input: &mut BytesInput,
     ) -> Result<MutationResult, Error> {
-        let seed = state.rand_mut().next();
-        let len_orig = input.mutator_bytes().len();
         let max_len = state.max_size();
+        if max_len == 0 {
+            return Ok(MutationResult::Skipped);
+        }
+        let seed = state.rand_mut().next();
+        let len_orig = input.mutator_bytes().len().min(max_len);
         input.resize(max_len, 0);
 
         // we assume that the fuzzer did not use this mutator, but instead utilised their own
@@ -431,13 +439,13 @@ where
         let data2 = Vec::from(other.mutator_bytes());
         drop(other_testcase);
 
-        let seed = state.rand_mut().next();
-        let mut out = vec![0u8; state.max_size()];
-
         let max_len = state.max_size();
-        let len_orig = input.len();
-
-        input.resize(max_len, 0);
+        if max_len == 0 {
+            return Ok(MutationResult::Skipped);
+        }
+        let seed = state.rand_mut().next();
+        let mut out = vec![0u8; max_len];
+        let len_orig = input.mutator_bytes().len();
 
         // we assume that the fuzzer did not use this mutator, but instead utilised their own
         let result = Rc::new(RefCell::new(Ok(MutationResult::Mutated)));
@@ -448,7 +456,7 @@ where
         });
         let new_len = unsafe {
             libafl_targets_libfuzzer_custom_crossover(
-                input.mutator_bytes_mut().as_mut_ptr(),
+                input.mutator_bytes().as_ptr(),
                 len_orig,
                 data2.as_ptr(),
                 data2.len(),
@@ -473,6 +481,23 @@ where
         }
 
         input.resize(new_len, 0);
+        input.mutator_bytes_mut().copy_from_slice(&out[..new_len]);
         Ok(MutationResult::Mutated)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use core::ptr;
+
+    use super::LLVMFuzzerMutate;
+
+    #[test]
+    fn test_llvm_fuzzer_mutate_null_and_zero_max_size() {
+        let mut buf = [1u8, 2, 3, 4];
+        unsafe {
+            assert_eq!(LLVMFuzzerMutate(ptr::null_mut(), 4, 4), 0);
+            assert_eq!(LLVMFuzzerMutate(buf.as_mut_ptr(), 4, 0), 0);
+        }
     }
 }

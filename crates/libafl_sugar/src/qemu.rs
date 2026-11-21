@@ -179,7 +179,7 @@ where
             };
 
             // Keep tracks of CMPs
-            let cmplog_observer = CmpLogObserver::new("cmplog", true);
+            let cmplog_observer = unsafe { CmpLogObserver::new("cmplog", true) };
 
             // New maximization map feedback linked to the edges observer and the feedback state
             let map_feedback = MaxMapFeedback::with_name("map_feedback", &edges_observer);

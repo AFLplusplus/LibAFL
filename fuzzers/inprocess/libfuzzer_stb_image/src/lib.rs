@@ -75,7 +75,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let cmplog_observer = CmpLogObserver::new("cmplog", true);
+    let cmplog_observer = unsafe { CmpLogObserver::new("cmplog", true) };
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR

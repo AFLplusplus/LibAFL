@@ -26,7 +26,7 @@
   ((CMPLOG_MAP_H * sizeof(CmpLogInstruction)) / sizeof(CmpLogRoutine))
 
 #define CMPLOG_MAP_RTN_EXTENDED_H \
-  ((CMPLOG_MAP_H * sizeof(CmpLogInstructionExtended)) / sizeof(CmpLogRoutine))
+  ((CMPLOG_MAP_H * sizeof(CmpLogInstructionExtended)) / sizeof(CmpLogRoutineExtended))
 
 #define CMPLOG_KIND_INS 0
 #define CMPLOG_KIND_RTN 1
@@ -110,10 +110,8 @@ extern uint8_t libafl_cmplog_enabled;
 static inline void cmplog_instructions_checked(uintptr_t k, uint8_t size,
                                                uint64_t arg1, uint64_t arg2,
                                                uint8_t arg1_is_const) {
-  if (!libafl_cmplog_enabled) { return; }
+  if (!libafl_cmplog_enabled || size == 0) { return; }
   libafl_cmplog_enabled = false;
-
-  if (size == 0) { return; }
   uint8_t shape = size - 1;
   uint16_t hits;
   if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_INS) {
@@ -139,10 +137,8 @@ static inline void cmplog_instructions_checked(uintptr_t k, uint8_t size,
 static inline void cmplog_instructions_checked_extended(
     uintptr_t k, uint8_t size, uint64_t arg1, uint64_t arg2, uint8_t attr) {
 #ifdef CMPLOG_EXTENDED
-  if (!libafl_cmplog_enabled) { return; }
+  if (!libafl_cmplog_enabled || size == 0) { return; }
   libafl_cmplog_enabled = false;
-
-  if (size == 0) { return; }
   uint8_t shape = size - 1;
 
   // printf("%ld %ld %ld\n", k, arg1, arg2);
@@ -192,7 +188,7 @@ static inline void cmplog_routines_checked(uintptr_t k, const uint8_t *ptr1,
     }
   }
 
-  hits &= CMPLOG_MAP_RTN_H - 1;
+  hits %= CMPLOG_MAP_RTN_H;
   MEMCPY(libafl_cmplog_map_ptr->vals.routines[k][hits].v0, ptr1, len);
   MEMCPY(libafl_cmplog_map_ptr->vals.routines[k][hits].v1, ptr2, len);
   libafl_cmplog_enabled = true;
@@ -219,7 +215,7 @@ static inline void cmplog_routines_checked_extended(uintptr_t      k,
     }
   }
 
-  hits &= CMPLOG_MAP_RTN_H - 1;
+  hits %= CMPLOG_MAP_RTN_EXTENDED_H;
   libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v0_len = 0x80 + len;
   libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v1_len = 0x80 + len;
   MEMCPY(libafl_cmplog_map_extended_ptr->vals.routines[k][hits].v0, ptr1, len);
@@ -237,14 +233,16 @@ static inline void cmplog_routines_checked_extended(uintptr_t      k,
 // Expose these three APIs so that you can still call into them from outside
 // libafl_targets
 
-void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape,
+void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t size,
                                           uint64_t arg1, uint64_t arg2);
-void __libafl_targets_cmplog_instructions_extended(uintptr_t k, uint8_t shape,
+void __libafl_targets_cmplog_instructions_extended(uintptr_t k, uint8_t size,
                                           uint64_t arg1, uint64_t arg2);
 void __libafl_targets_cmplog_routines(uintptr_t k, const uint8_t *ptr1,
                                       const uint8_t *ptr2);
 
 void __libafl_targets_cmplog_routines_len(uintptr_t k, const uint8_t *ptr1,
                                           const uint8_t *ptr2, size_t len);
+void __libafl_targets_cmplog_routines_strn(uintptr_t k, const uint8_t *ptr1,
+                                           const uint8_t *ptr2, size_t len);
 
 #endif

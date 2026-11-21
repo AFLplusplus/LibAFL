@@ -113,8 +113,9 @@ pub fn main() {
             unsafe { StdMapObserver::from_mut_ptr("second-edges", second_edges.0, second_edges.1) };
 
         // create a map swapper so that we can replace the coverage map pointer (requires feature pointer_maps!)
-        let map_swapper =
-            DifferentialAFLMapSwapObserver::new(&mut first_map_observer, &mut second_map_observer);
+        let map_swapper = unsafe {
+            DifferentialAFLMapSwapObserver::new(&mut first_map_observer, &mut second_map_observer)
+        };
 
         // create a combined map observer, e.g. for calibration
         // we use MultiMapObserver::differential to indicate that we want to use the observer in
@@ -153,8 +154,9 @@ pub fn main() {
         };
 
         // create a map swapper so that we can replace the coverage map pointer (requires feature pointer_maps!)
-        let map_swapper =
-            DifferentialAFLMapSwapObserver::new(&mut first_map_observer, &mut second_map_observer);
+        let map_swapper = unsafe {
+            DifferentialAFLMapSwapObserver::new(&mut first_map_observer, &mut second_map_observer)
+        };
 
         // create a combined map observer, e.g. for calibration
         // we use StdMapObserver::differential to indicate that we want to use the observer in

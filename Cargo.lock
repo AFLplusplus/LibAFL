@@ -3020,6 +3020,7 @@ dependencies = [
  "meminterval",
  "nix 0.31.3",
  "ownedref",
+ "postcard",
  "rangemap",
  "rustversion",
  "serde",

@@ -290,7 +290,7 @@ fn fuzz(
     let time_observer = TimeObserver::new("time");
 
     // Create an observation channel using cmplog map
-    let cmplog_observer = CmpLogObserver::new("cmplog", true);
+    let cmplog_observer = unsafe { CmpLogObserver::new("cmplog", true) };
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 

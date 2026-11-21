@@ -205,7 +205,7 @@ macro_rules! fuzz_with {
             let oom_observer = OomObserver::new($options.rss_limit(), $options.malloc_limit());
 
             // Create the Cmp observer
-            let cmplog_observer = CmpLogObserver::new("cmplog", true);
+            let cmplog_observer = unsafe { CmpLogObserver::new("cmplog", true) };
 
             // Create an observer using the cmp map for value profile
             let value_profile_observer = unsafe { ConstMapObserver::from_mut_ptr("cmps", nonnull_raw_mut!(CMP_MAP)) };

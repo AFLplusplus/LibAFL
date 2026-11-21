@@ -28,7 +28,9 @@ unsafe extern "C" {
 /// See <https://github.com/AFLplusplus/LibAFL/issues/769>.
 ///
 /// # Safety
-/// Calls the unsafe `__sanitizer_set_death_callback` symbol, but should be safe to call otherwise.
+/// The caller must ensure `E`, `EM`, `I`, `OF`, `S`, and `Z` match the concrete executor,
+/// event manager, input, objective feedback, state, and fuzzer types stored in `GLOBAL_STATE`
+/// whenever `GLOBAL_STATE` is active.
 pub unsafe fn setup_asan_callback<E, EM, I, OF, S, Z>(_executor: &E, _event_mgr: &EM, _fuzzer: &Z)
 where
     E: Executor<EM, I, S, Z> + HasObservers,

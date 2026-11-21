@@ -273,7 +273,7 @@ fn fuzz(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let cmplog_observer = CmpLogObserver::new("cmplog", true);
+    let cmplog_observer = unsafe { CmpLogObserver::new("cmplog", true) };
 
     let map_feedback = MaxMapFeedback::new(&edges_observer);
 
