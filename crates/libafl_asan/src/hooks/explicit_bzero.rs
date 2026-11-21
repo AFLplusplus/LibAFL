@@ -19,7 +19,7 @@ pub unsafe extern "C" fn explicit_bzero(s: *mut c_void, len: size_t) {
         }
 
         if s.is_null() {
-            asan_panic(b"explicit_bzero - s is null".as_ptr() as *const c_char);
+            asan_panic(c"explicit_bzero - s is null".as_ptr() as *const c_char);
         }
 
         asan_store(s, len);

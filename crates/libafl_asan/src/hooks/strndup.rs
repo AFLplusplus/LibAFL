@@ -28,10 +28,10 @@ pub unsafe extern "C" fn strndup(cs: *const c_char, n: size_t) -> *mut c_char {
         while len < n && *cs.add(len) != 0 {
             len += 1;
         }
-        asan_load(cs as *const c_void, len + 1);
+        asan_load(cs as *const c_void, if len < n { len + 1 } else { len });
 
         let dest = asan_alloc(len + 1, 0) as *mut c_char;
-        copy(cs, dest, len + 1);
+        copy(cs, dest, len);
         *dest.add(len) = 0;
         dest
     }

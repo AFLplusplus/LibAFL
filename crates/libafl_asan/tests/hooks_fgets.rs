@@ -32,4 +32,14 @@ mod tests {
         unsafe { fgets(null_mut(), 10, stream) };
         unreachable!();
     }
+
+    #[test]
+    fn test_fgets_non_positive_len() {
+        let mut buf = [0u8; 10];
+        let stream = 0xdeadface as *mut FILE;
+        assert!(unsafe { fgets(buf.as_mut_ptr() as *mut c_char, 0, stream) }.is_null());
+        assert!(unsafe { fgets(buf.as_mut_ptr() as *mut c_char, -5, stream) }.is_null());
+        assert!(unsafe { fgets(null_mut(), 0, stream) }.is_null());
+        assert!(unsafe { fgets(null_mut(), -5, stream) }.is_null());
+    }
 }

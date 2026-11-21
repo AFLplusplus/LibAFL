@@ -110,4 +110,20 @@ mod tests {
         unsafe { atoi(c"-2147483649".as_ptr() as *const c_char) };
         unreachable!();
     }
+
+    #[test]
+    fn atoi_test_empty() {
+        use libafl_asan::{asan_alloc, asan_dealloc};
+
+        assert_eq!(unsafe { atoi(c"".as_ptr()) }, 0);
+        assert_eq!(unsafe { atoi(c"   \t\n".as_ptr()) }, 0);
+        assert_eq!(unsafe { atoi(c"+".as_ptr()) }, 0);
+        assert_eq!(unsafe { atoi(c"-".as_ptr()) }, 0);
+        unsafe {
+            let buf = asan_alloc(3, 8) as *mut u8;
+            core::slice::from_raw_parts_mut(buf, 3).copy_from_slice(b"42x");
+            assert_eq!(atoi(buf as *const c_char), 42);
+            asan_dealloc(buf.cast());
+        }
+    }
 }

@@ -1,6 +1,6 @@
 use core::{
     ffi::{c_char, c_void},
-    ptr::copy,
+    ptr::{copy, write_bytes},
 };
 
 use log::trace;
@@ -30,10 +30,10 @@ pub unsafe extern "C" fn strncpy(dst: *mut c_char, src: *const c_char, n: size_t
         while len < n && *src.add(len) != 0 {
             len += 1;
         }
-        asan_store(dst as *const c_void, len);
-
-        asan_load(src as *const c_void, len);
+        asan_load(src as *const c_void, if len < n { len + 1 } else { len });
+        asan_store(dst as *const c_void, n);
         copy(src, dst, len);
+        write_bytes(dst.add(len), 0, n - len);
 
         dst
     }

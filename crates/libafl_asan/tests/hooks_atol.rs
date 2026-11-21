@@ -144,4 +144,12 @@ mod tests {
         unsafe { atol(c"-9223372036854775809".as_ptr() as *const c_char) };
         unreachable!();
     }
+
+    #[test]
+    fn atol_test_empty() {
+        assert_eq!(unsafe { atol(c"".as_ptr()) }, 0);
+        assert_eq!(unsafe { atol(c"   \t\n".as_ptr()) }, 0);
+        assert_eq!(unsafe { atol(c"+".as_ptr()) }, 0);
+        assert_eq!(unsafe { atol(c"-".as_ptr()) }, 0);
+    }
 }

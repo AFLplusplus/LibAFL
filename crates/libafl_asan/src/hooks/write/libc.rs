@@ -31,11 +31,12 @@ pub unsafe extern "C" fn write(fd: c_int, buf: *const c_void, count: size_t) -> 
     unsafe {
         trace!("write - fd: {fd:#x}, buf: {buf:p}, count: {count:#x}");
 
-        if buf.is_null() && count != 0 {
-            asan_panic(c"msg is null".as_ptr() as *const c_char);
+        if count != 0 {
+            if buf.is_null() {
+                asan_panic(c"write - buf is null".as_ptr() as *const c_char);
+            }
+            asan_load(buf, count);
         }
-
-        asan_load(buf, count);
         let addr = SYSCALL_ADDR.get_or_insert_with(|| {
             asan_sym(FunctionSyscall::NAME.as_ptr() as *const c_char) as GuestAddr
         });

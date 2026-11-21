@@ -8,7 +8,6 @@ mod tests {
 
     #[test]
     fn test_wcsncmp_zero_length() {
-        expect_panic();
         let ret = unsafe { wcsncmp(null(), null(), 0) };
         assert_eq!(ret, 0);
     }
@@ -179,5 +178,43 @@ mod tests {
             )
         };
         assert_eq!(ret, 0);
+    }
+
+    #[test]
+    fn test_wcsncmp_bounds() {
+        use libafl_asan::{asan_alloc, asan_dealloc};
+
+        unsafe {
+            let elem_sz = size_of::<wchar_t>();
+            let align = align_of::<wchar_t>().max(8);
+            let p1 = asan_alloc(4 * elem_sz, align) as *mut wchar_t;
+            let p2 = asan_alloc(4 * elem_sz, align) as *mut wchar_t;
+            for i in 0..4 {
+                *p1.add(i) = (0x41 + i as i32) as wchar_t;
+                *p2.add(i) = (0x41 + i as i32) as wchar_t;
+            }
+            assert_eq!(wcsncmp(p1, p2, 4), 0);
+
+            let short = asan_alloc(elem_sz, align) as *mut wchar_t;
+            *short = 0x7A as wchar_t;
+            assert!(wcsncmp(widecstr!("a").as_ptr() as *const wchar_t, short, 10) < 0);
+
+            let nul_buf = asan_alloc(3 * elem_sz, align) as *mut wchar_t;
+            *nul_buf = 0x61 as wchar_t;
+            *nul_buf.add(1) = 0x62 as wchar_t;
+            *nul_buf.add(2) = 0 as wchar_t;
+            assert_eq!(
+                wcsncmp(nul_buf, widecstr!("ab").as_ptr() as *const wchar_t, 10),
+                0
+            );
+            let min_w = [wchar_t::MIN, 0];
+            let pos_w = [1 as wchar_t, 0];
+            assert!(wcsncmp(min_w.as_ptr(), pos_w.as_ptr(), 1) < 0);
+
+            asan_dealloc(nul_buf.cast());
+            asan_dealloc(short.cast());
+            asan_dealloc(p2.cast());
+            asan_dealloc(p1.cast());
+        }
     }
 }

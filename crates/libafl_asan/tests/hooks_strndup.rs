@@ -10,6 +10,20 @@ mod tests {
     use libafl_asan::{expect_panic, hooks::strndup::strndup};
 
     #[test]
+    fn test_strndup_bounds() {
+        use libafl_asan::{asan_alloc, asan_dealloc};
+
+        unsafe {
+            let src = asan_alloc(4, 8) as *mut u8;
+            core::slice::from_raw_parts_mut(src, 4).copy_from_slice(b"abcd");
+            let dup = strndup(src as *const c_char, 4);
+            assert_eq!(from_raw_parts(dup as *const u8, 5), b"abcd\0");
+            asan_dealloc(dup.cast());
+            asan_dealloc(src.cast());
+        }
+    }
+
+    #[test]
     fn test_strndup_cs_null_zero_length() {
         let ret = unsafe { strndup(null() as *const c_char, 0x0) };
         assert_ne!(ret, null_mut());

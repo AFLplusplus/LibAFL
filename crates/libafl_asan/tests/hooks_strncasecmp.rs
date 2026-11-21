@@ -7,7 +7,6 @@ mod tests {
 
     #[test]
     fn test_strncasecmp_zero_length() {
-        expect_panic();
         let ret = unsafe { strncasecmp(null(), null(), 0) };
         assert_eq!(ret, 0);
     }
@@ -178,5 +177,28 @@ mod tests {
             )
         };
         assert_eq!(ret, 0);
+    }
+
+    #[test]
+    fn test_strncasecmp_bounds() {
+        use libafl_asan::{asan_alloc, asan_dealloc};
+
+        unsafe {
+            let p1 = asan_alloc(4, 8) as *mut u8;
+            let p2 = asan_alloc(4, 8) as *mut u8;
+            core::slice::from_raw_parts_mut(p1, 4).copy_from_slice(b"AbCd");
+            core::slice::from_raw_parts_mut(p2, 4).copy_from_slice(b"aBcD");
+            assert_eq!(strncasecmp(p1 as *const c_char, p2 as *const c_char, 4), 0);
+
+            let short = asan_alloc(1, 8) as *mut u8;
+            *short = b'Z';
+            assert!(strncasecmp(c"a".as_ptr(), short as *const c_char, 10) < 0);
+            assert!(strncasecmp(c"_".as_ptr(), c"A".as_ptr(), 1) < 0);
+            assert!(strncasecmp(c"\x80".as_ptr(), c"\x7f".as_ptr(), 1) > 0);
+
+            asan_dealloc(short.cast());
+            asan_dealloc(p2.cast());
+            asan_dealloc(p1.cast());
+        }
     }
 }

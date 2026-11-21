@@ -1,5 +1,4 @@
 use core::{
-    cmp::min,
     ffi::{c_char, c_void},
     ptr::{copy, write_bytes},
 };
@@ -17,7 +16,7 @@ pub unsafe extern "C" fn stpncpy(
     dsize: size_t,
 ) -> *mut c_char {
     unsafe {
-        trace!("stpncpy - dst: {dst:p}, src: {src:p}, dsize: {dsize:#x}",);
+        trace!("stpncpy - dst: {dst:p}, src: {src:p}, dsize: {dsize:#x}");
 
         if dsize == 0 {
             return dst;
@@ -32,15 +31,17 @@ pub unsafe extern "C" fn stpncpy(
         }
 
         let mut len = 0;
-        while *src.add(len) != 0 {
+        while len < dsize && *src.add(len) != 0 {
             len += 1;
         }
-        asan_load(src as *const c_void, len + 1);
+        asan_load(
+            src as *const c_void,
+            if len < dsize { len + 1 } else { len },
+        );
         asan_store(dst as *const c_void, dsize);
 
-        let dlen = min(len + 1, dsize);
-        copy(src, dst, dlen);
-        write_bytes(dst.add(dlen), 0, dsize - dlen);
-        dst.add(dsize)
+        copy(src, dst, len);
+        write_bytes(dst.add(len), 0, dsize - len);
+        dst.add(len)
     }
 }

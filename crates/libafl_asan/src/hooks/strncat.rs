@@ -31,16 +31,18 @@ pub unsafe extern "C" fn strncat(s: *mut c_char, ct: *const c_char, n: size_t) -
             s_len += 1;
         }
         let mut ct_len = 0;
-        while *ct.add(ct_len) != 0 {
+        while ct_len < n && *ct.add(ct_len) != 0 {
             ct_len += 1;
         }
 
-        let c_len = ct_len.min(n);
-
-        asan_store(s.add(s_len) as *const c_void, c_len + 1);
-        asan_load(ct as *const c_void, c_len);
-        copy(ct, s.add(s_len), c_len);
-        *s.add(s_len + c_len + 1) = 0;
+        asan_load(s as *const c_void, s_len + 1);
+        asan_load(
+            ct as *const c_void,
+            if ct_len < n { ct_len + 1 } else { ct_len },
+        );
+        asan_store(s.add(s_len) as *const c_void, ct_len + 1);
+        copy(ct, s.add(s_len), ct_len);
+        *s.add(s_len + ct_len) = 0;
         s
     }
 }

@@ -1,14 +1,27 @@
-#[cfg(all(
-    test,
-    feature = "hooks",
-    feature = "syscalls",
-    target_os = "linux",
-    not(feature = "libc")
-))]
+#[cfg(all(test, feature = "hooks", feature = "syscalls", target_os = "linux"))]
 mod tests {
     use core::{ffi::c_void, ptr::null_mut};
 
-    use libafl_asan::hooks::{expect_panic, size_t, write::linux::write};
+    use libafl_asan::{asan_alloc, asan_dealloc, expect_panic, hooks::write::linux::write, size_t};
+
+    #[test]
+    fn test_linux_pipe_write() {
+        use std::{io::Read, os::fd::AsRawFd};
+
+        let (mut reader, writer) = std::io::pipe().unwrap();
+        let mut out = [0u8; 4];
+        unsafe {
+            let src = asan_alloc(4, 8) as *mut u8;
+            core::slice::from_raw_parts_mut(src, 4).copy_from_slice(b"pong");
+            assert_eq!(write(writer.as_raw_fd(), src.cast(), 4), 4);
+            reader.read_exact(&mut out).unwrap();
+            assert_eq!(&out, b"pong");
+            assert_eq!(write(writer.as_raw_fd(), src.add(4).cast(), 0), 0);
+            assert_eq!(write(-1, null_mut(), 0), -1);
+            assert_eq!(write(-1, src.cast(), 4), -1);
+            asan_dealloc(src.cast());
+        }
+    }
 
     #[test]
     fn test_read_invalid_args() {

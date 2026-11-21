@@ -26,12 +26,16 @@ pub unsafe extern "C" fn fgets(buf: *mut c_char, n: c_int, stream: *mut FILE) ->
     unsafe {
         trace!("fgets - buf: {buf:p}, n: {n:#x}, stream: {stream:p}");
 
-        if buf.is_null() && n != 0 {
-            asan_panic(c"fgets - buf is null".as_ptr() as *const c_char);
-        }
-
         if stream.is_null() {
             asan_panic(c"fgets - stream is null".as_ptr() as *const c_char);
+        }
+
+        if n <= 0 {
+            return core::ptr::null_mut();
+        }
+
+        if buf.is_null() {
+            asan_panic(c"fgets - buf is null".as_ptr() as *const c_char);
         }
 
         asan_store(buf as *const c_void, n as usize);

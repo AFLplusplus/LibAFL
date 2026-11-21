@@ -9,6 +9,25 @@ mod tests {
     use libafl_asan::{expect_panic, hooks::strncat::strncat};
 
     #[test]
+    fn test_strncat_bounds() {
+        use libafl_asan::{asan_alloc, asan_dealloc};
+
+        unsafe {
+            let s = asan_alloc(6, 8) as *mut u8;
+            core::slice::from_raw_parts_mut(s, 6).copy_from_slice(b"ab\0zzz");
+            let ct = asan_alloc(3, 8) as *mut u8;
+            core::slice::from_raw_parts_mut(ct, 3).copy_from_slice(b"cde");
+            assert_eq!(
+                strncat(s as *mut c_char, ct as *const c_char, 3),
+                s as *mut c_char
+            );
+            assert_eq!(core::slice::from_raw_parts(s, 6), b"abcde\0");
+            asan_dealloc(ct.cast());
+            asan_dealloc(s.cast());
+        }
+    }
+
+    #[test]
     fn test_strncat_zero_length() {
         let ret = unsafe { strncat(null_mut(), null_mut(), 0) };
         assert_eq!(ret, null_mut());

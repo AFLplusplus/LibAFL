@@ -20,16 +20,14 @@ pub unsafe extern "C" fn strnlen(cs: *const c_char, maxlen: size_t) -> size_t {
         }
 
         let mut len = 0;
-        while *cs.add(len) != 0 {
+        while len < maxlen && *cs.add(len) != 0 {
             len += 1;
         }
 
-        if len < maxlen {
-            asan_load(cs as *const c_void, len + 1);
-            len
-        } else {
-            asan_load(cs as *const c_void, maxlen);
-            maxlen
-        }
+        asan_load(
+            cs as *const c_void,
+            if len < maxlen { len + 1 } else { maxlen },
+        );
+        len
     }
 }

@@ -33,6 +33,19 @@ mod tests {
     }
 
     #[test]
+    fn test_strnlen_bounded() {
+        use libafl_asan::{asan_alloc, asan_dealloc};
+
+        assert_eq!(unsafe { strnlen(c"abcdefghij".as_ptr(), 5) }, 5);
+        unsafe {
+            let exact = asan_alloc(4, 8) as *mut u8;
+            core::slice::from_raw_parts_mut(exact, 4).copy_from_slice(b"abcd");
+            assert_eq!(strnlen(exact as *const c_char, 4), 4);
+            asan_dealloc(exact.cast());
+        }
+    }
+
+    #[test]
     fn test_strnlen_partial() {
         let data = c"abcdefghij";
         let ret = unsafe { strnlen(data.as_ptr() as *const c_char, 5) };

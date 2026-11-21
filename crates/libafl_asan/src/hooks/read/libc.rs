@@ -31,11 +31,12 @@ pub unsafe extern "C" fn read(fd: c_int, buf: *mut c_void, count: size_t) -> ssi
     unsafe {
         trace!("read - fd: {fd:#x}, buf: {buf:p}, count: {count:#x}");
 
-        if buf.is_null() && count != 0 {
-            asan_panic(c"read - buf is null".as_ptr() as *const c_char);
+        if count != 0 {
+            if buf.is_null() {
+                asan_panic(c"read - buf is null".as_ptr() as *const c_char);
+            }
+            asan_store(buf, count);
         }
-
-        asan_store(buf, count);
         let addr = SYSCALL_ADDR.get_or_insert_with(|| {
             asan_sym(FunctionSyscall::NAME.as_ptr() as *const c_char) as GuestAddr
         });
