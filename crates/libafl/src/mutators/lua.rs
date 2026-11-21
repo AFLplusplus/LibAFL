@@ -60,17 +60,31 @@ pub fn load_lua_mutations<
     let mut mutations: Vec<Box<dyn Mutator<I, S>>> = vec![];
     let mut rand_state = RandState(StdRand::with_seed(1337));
 
-    let lua_dir = fs::read_dir(lua_path).unwrap();
+    let mut paths = Vec::new();
+    for entry in fs::read_dir(lua_path)? {
+        let path = entry?.path();
+        if path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("lua"))
+            && path.is_file()
+        {
+            paths.push(path);
+        }
+    }
+    paths.sort();
 
-    for mutation in lua_dir {
-        let mutation = mutation?;
-        log::info!("Loading lua_mutator from {mutation:?}");
-        let mutator =
-            LuaMutator::eat_errors(&mut rand_state, &fs::read_to_string(mutation.path())?);
-        if let Ok(mutator) = mutator {
-            mutations.push(Box::new(mutator));
-        } else {
-            log::warn!("Mutator {mutation:?} did not run: {mutator:?}");
+    for path in paths {
+        log::info!("Loading lua_mutator from {}", path.display());
+        let name = format!(
+            "LuaMutator:{}",
+            path.file_stem().unwrap_or_default().to_string_lossy()
+        );
+        match fs::read_to_string(&path)
+            .map_err(Error::from)
+            .and_then(|src| LuaMutator::eat_errors(&mut rand_state, &src))
+        {
+            Ok(mutator) => mutations.push(Box::new(mutator.with_name(name))),
+            Err(err) => log::warn!("Mutator {} did not run: {err:?}", path.display()),
         }
     }
     Ok(mutations)
@@ -90,10 +104,9 @@ fn create_lua_fn<S: HasRand>(
     timeout_steps_min: Option<u32>,
     test: bool,
 ) -> Result<(Function, Rc<Cell<bool>>), Error> {
-    #[allow(clippy::cast_possible_truncation)] // we specifically want a u32
     let lua_seed = state.rand_mut().next() as u32;
 
-    let timeouted_once = Rc::new(Cell::new(true));
+    let timeouted_once = Rc::new(Cell::new(false));
     let timeouted_once_cb = timeouted_once.clone();
 
     // Seed
@@ -107,25 +120,24 @@ fn create_lua_fn<S: HasRand>(
 
         lua.set_hook(hook_triggers, move |_lua, _debug| {
             log::trace!("I'm here. Timeouted_once: {timeouted_once_cb:?}");
-            if timeouted_once_cb.get() {
+            if timeouted_once_cb.replace(true) {
                 Err(mlua::Error::RuntimeError(
                     "Instruction limit reached!".to_string(),
                 ))
             } else {
-                timeouted_once_cb.set(false);
                 Ok(VmState::Continue)
             }
         })
-        .unwrap();
+        .map_err(convert_error)?;
     }
 
-    let func = mutator_lua_fn.to_string();
-    let chunk = lua.load(&func);
+    let chunk = lua.load(mutator_lua_fn);
 
     let mutator: Function = chunk.eval().map_err(convert_error)?;
 
     // Simple test that the mutator works
     if test {
+        timeouted_once.set(false);
         let bytes = vec![1_u8, 2, 3, 4, 5, 6, 7, 8, 9];
         drop(mutator.call::<Vec<u8>>((bytes,)).map_err(convert_error)?);
     }
@@ -137,6 +149,8 @@ pub struct LuaMutator {
     /// The Lua VM
     #[allow(dead_code)] // We need to keep a handle around.
     lua: Lua,
+    /// Name of this mutator instance
+    name: Cow<'static, str>,
     /// The function string we loaded
     func: String,
     /// The actual lua function we can call
@@ -152,6 +166,7 @@ pub struct LuaMutator {
 impl core::fmt::Debug for LuaMutator {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("LuaMutator")
+            .field("name", &self.name)
             .field("func", &self.func)
             .field("mutator", &self.mutator)
             .field(
@@ -166,8 +181,7 @@ impl core::fmt::Debug for LuaMutator {
 
 impl LuaMutator {
     /// Creates a new lua mutator, will call the mutator with a random bytes sequence to make sure it's not crashing.
-    /// Will block if the mutator is an endless loop!
-    #[allow(unused)]
+    /// Will error if the mutator hits the instruction limit during validation.
     pub fn new<S: HasRand>(state: &mut S, mutator_lua_fn: &str) -> Result<Self, Error> {
         let lua = Lua::new();
         let func = mutator_lua_fn.to_string();
@@ -180,6 +194,7 @@ impl LuaMutator {
         )?;
         Ok(Self {
             lua,
+            name: Cow::Borrowed("LuaMutator"),
             func,
             mutator,
             timeout_handler_called_once: timeouted_once,
@@ -189,25 +204,24 @@ impl LuaMutator {
     }
 
     /// Creates a new lua mutator, will call the mutator with a random bytes sequence to make sure it's not crashing.
-    /// Will block if the mutator is an endless loop!
+    /// Runtime errors during subsequent mutations will be converted into [`MutationResult::Skipped`].
     pub fn eat_errors<S: HasRand>(state: &mut S, mutator_lua_fn: &str) -> Result<Self, Error> {
-        let lua = Lua::new();
-        let func = mutator_lua_fn.to_string();
-        let (mutator, timeouted_once) = create_lua_fn(
-            &lua,
-            state,
-            mutator_lua_fn,
-            Some(DEFAULT_TIMEOUT_STEPS),
-            true,
-        )?;
-        Ok(Self {
-            lua,
-            func,
-            mutator,
-            timeout_handler_called_once: timeouted_once,
-            eat_errors: true,
-            errored: false,
-        })
+        let mut mutator = Self::new(state, mutator_lua_fn)?;
+        mutator.eat_errors = true;
+        Ok(mutator)
+    }
+
+    /// Sets a custom [`Named::name`] for this [`LuaMutator`].
+    #[must_use]
+    pub fn with_name(mut self, name: impl Into<Cow<'static, str>>) -> Self {
+        self.name = name.into();
+        self
+    }
+
+    /// Returns whether this mutator encountered and swallowed a runtime error when `eat_errors` is enabled.
+    #[must_use]
+    pub fn errored(&self) -> bool {
+        self.errored
     }
 }
 
@@ -219,28 +233,25 @@ where
     fn mutate(&mut self, _state: &mut S, input: &mut I) -> Result<MutationResult, Error> {
         self.timeout_handler_called_once.set(false);
         let bytes = input.mutator_bytes().to_vec();
-        let result = match self.mutator.call::<Vec<u8>>(bytes) {
-            Err(err) => Err(Error::illegal_state(format!("Lua mutation failed: {err}"))),
+        match self.mutator.call::<Vec<u8>>(bytes) {
+            Err(err) => {
+                if self.eat_errors {
+                    log::debug!("Mutation Errored ({err}): {}", self.func);
+                    self.errored = true;
+                    Ok(MutationResult::Skipped)
+                } else {
+                    Err(Error::illegal_state(format!("Lua mutation failed: {err}")))
+                }
+            }
             Ok(mutated) => {
-                if mutated.eq(input.mutator_bytes()) {
+                if mutated == input.mutator_bytes() {
                     Ok(MutationResult::Skipped)
                 } else {
                     input.resize(mutated.len(), 0);
-                    input.mutator_bytes_mut().clone_from_slice(&mutated);
+                    input.mutator_bytes_mut().copy_from_slice(&mutated);
                     Ok(MutationResult::Mutated)
                 }
             }
-        };
-        if self.eat_errors {
-            log::debug!("Mutation Errored: {}", self.func);
-            self.errored = true;
-            if result.is_err() {
-                Ok(MutationResult::Skipped)
-            } else {
-                result
-            }
-        } else {
-            result
         }
     }
 
@@ -252,7 +263,7 @@ where
 
 impl Named for LuaMutator {
     fn name(&self) -> &Cow<'static, str> {
-        &Cow::Borrowed("LuaMutator")
+        &self.name
     }
 }
 
@@ -261,7 +272,7 @@ mod tests {
     #[cfg(feature = "std")]
     use std::println;
 
-    use libafl_bolts::Error;
+    use libafl_bolts::{Error, Named};
 
     use crate::{
         inputs::BytesInput,
@@ -303,21 +314,104 @@ mod tests {
     #[test]
     fn test_timeout() {
         let mut state: NopState<BytesInput> = NopState::new();
-
-        assert!(
-            matches!(
-                LuaMutator::new(
-                    &mut state,
-                    r"function (bytes)
-                      while true do
-                        i = i + 1
-                      end
-                    end
-              "
-                ),
-                Err(Error::IllegalArgument(_, _))
-            ),
-            "Expected endless loop to raise an 'IllegalArgument' error!"
+        let res = LuaMutator::new(
+            &mut state,
+            "function (bytes) local i = 0 while true do i = i + 1 end end",
         );
+        assert!(
+            matches!(res, Err(Error::IllegalArgument(msg, _)) if msg.contains("Instruction limit")),
+            "Expected instruction-limit error!"
+        );
+    }
+
+    #[test]
+    fn test_mutate_timeout_and_eat_errors() {
+        let mut state: NopState<BytesInput> = NopState::new();
+        let script = r"function (bytes)
+            if #bytes == 0 then error('empty') end
+            if bytes[1] == 42 then local i = 0 while true do i = i + 1 end end
+            bytes[1] = (bytes[1] + 1) % 256
+            return bytes
+        end";
+
+        let mut strict = LuaMutator::new(&mut state, script).unwrap();
+        let mut hang = BytesInput::new(vec![42, 1]);
+        assert!(strict.mutate(&mut state, &mut hang).is_err());
+
+        let mut forgiving = LuaMutator::eat_errors(&mut state, script)
+            .unwrap()
+            .with_name("custom_inc");
+        assert_eq!(forgiving.name().as_ref(), "custom_inc");
+        let mut ok = BytesInput::new(vec![10, 20]);
+        assert_eq!(
+            forgiving.mutate(&mut state, &mut ok).unwrap(),
+            MutationResult::Mutated
+        );
+        assert!(!forgiving.errored());
+
+        assert_eq!(
+            forgiving.mutate(&mut state, &mut hang).unwrap(),
+            MutationResult::Skipped
+        );
+        assert!(forgiving.errored());
+        // VM remains usable after a caught timeout and runtime error while `errored()` stays sticky.
+        assert_eq!(
+            forgiving
+                .mutate(&mut state, &mut BytesInput::new(vec![]))
+                .unwrap(),
+            MutationResult::Skipped
+        );
+        assert_eq!(
+            forgiving.mutate(&mut state, &mut ok).unwrap(),
+            MutationResult::Mutated
+        );
+        assert!(forgiving.errored());
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_load_lua_mutations_filters_sorts_and_names() {
+        use std::{fs, path::PathBuf};
+
+        use crate::{inputs::HasMutatorBytes, mutators::lua::load_lua_mutations};
+
+        struct TempDirGuard(PathBuf);
+        impl Drop for TempDirGuard {
+            fn drop(&mut self) {
+                if let Err(err) = fs::remove_dir_all(&self.0) {
+                    log::debug!("Failed to clean temp dir {}: {err}", self.0.display());
+                }
+            }
+        }
+
+        let dir = std::env::temp_dir().join(format!("libafl_lua_test_{}", std::process::id()));
+        let guard = TempDirGuard(dir);
+        fs::create_dir_all(guard.0.join("nested.lua")).unwrap();
+        fs::write(guard.0.join("README.md"), "ignored").unwrap();
+        fs::write(guard.0.join("c_bad.lua"), "not valid lua").unwrap();
+        fs::write(
+            guard.0.join("b_second.LUA"),
+            "return function(b) b[1] = 2 return b end",
+        )
+        .unwrap();
+        fs::write(
+            guard.0.join("a_first.lua"),
+            "return function(b) b[1] = 1 return b end",
+        )
+        .unwrap();
+
+        let mut mutators =
+            load_lua_mutations::<BytesInput, NopState<BytesInput>>(&guard.0).unwrap();
+        assert_eq!(mutators.len(), 2);
+        assert_eq!(mutators[0].name().as_ref(), "LuaMutator:a_first");
+        assert_eq!(mutators[1].name().as_ref(), "LuaMutator:b_second");
+
+        let mut state: NopState<BytesInput> = NopState::new();
+        let mut input = BytesInput::new(vec![9, 9]);
+        assert_eq!(
+            mutators[0].mutate(&mut state, &mut input).unwrap(),
+            MutationResult::Mutated
+        );
+        assert_eq!(input.mutator_bytes(), &[1, 9]);
     }
 }
