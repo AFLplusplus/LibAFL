@@ -30,6 +30,7 @@ use crate::{
 };
 
 // const MAX_NB_RECEIVED_AT_ONCE: usize = 100;
+const MAX_MULTI_MACHINE_MSG_SIZE: usize = 128 << 20;
 
 #[bitflags(default = SendToParent | SendToChildren)]
 #[repr(u8)]
@@ -56,9 +57,9 @@ pub enum MultiMachineMsg<'a, I> {
     Event(OwnedRef<'a, EventWithStats<I>>),
 }
 
-/// We do not use raw pointers, so no problem with thead-safety
-unsafe impl<I: Input> Send for MultiMachineMsg<'_, I> {}
-unsafe impl<I: Input> Sync for MultiMachineMsg<'_, I> {}
+// SAFETY: `[u8]` and `EventWithStats<I>` are `Send + Sync` when `I: Send + Sync`; `RefRaw` requires a valid `&'a T`.
+unsafe impl<I: Input + Send + Sync> Send for MultiMachineMsg<'_, I> {}
+unsafe impl<I: Input + Send + Sync> Sync for MultiMachineMsg<'_, I> {}
 
 impl<'a, I> MultiMachineMsg<'a, I> {
     /// Create a new [`MultiMachineMsg`] as event.
@@ -256,7 +257,7 @@ where
     ///
     /// This should be run **only once**, in the same process as the llmp hooks, and before the hooks
     /// are effectively used.
-    unsafe fn init<I: Input>(
+    unsafe fn init<I: Input + Send + Sync>(
         self_mutex: &Arc<RwLock<Self>>,
         rt: &Arc<Runtime>,
     ) -> Result<(), Error> {
@@ -344,6 +345,10 @@ where
         self.old_msgs.push(msg.to_vec());
     }
 
+    pub(crate) fn add_past_msg_owned(&mut self, msg: Vec<u8>) {
+        self.old_msgs.push(msg);
+    }
+
     /// The compressor
     #[cfg(feature = "llmp_compression")]
     pub fn compressor(&mut self) -> &GzipCompressor {
@@ -353,7 +358,6 @@ where
     /// Read a [`MultiMachineMsg`] from a stream.
     /// Expects a message written by [`TcpMultiMachineState::write_msg`].
     /// If there is nothing to read from the stream, return asap with Ok(None).
-    #[expect(clippy::uninit_vec)]
     async fn read_msg<'a, I: Input + 'a>(
         stream: &mut TcpStream,
     ) -> Result<Option<MultiMachineMsg<'a, I>>, Error> {
@@ -379,8 +383,12 @@ where
 
         log::debug!("Received dummy byte!");
 
-        // we should always read the dummy byte at this point.
-        assert_eq!(u8::from_le_bytes(dummy_byte), DUMMY_BYTE);
+        if dummy_byte != [DUMMY_BYTE] {
+            return Err(Error::illegal_state(format!(
+                "Invalid multi-machine frame header byte: {:#x}",
+                dummy_byte[0]
+            )));
+        }
 
         // 1. Read msg size
         let mut node_msg_len: [u8; 4] = [0; 4];
@@ -388,16 +396,17 @@ where
         stream.read_exact(&mut node_msg_len).await?;
         log::debug!("msg len received.");
         let node_msg_len = u32::from_le_bytes(node_msg_len) as usize;
+        if node_msg_len > MAX_MULTI_MACHINE_MSG_SIZE {
+            return Err(Error::illegal_state(format!(
+                "Multi-machine message length {node_msg_len} exceeds limit {MAX_MULTI_MACHINE_MSG_SIZE}"
+            )));
+        }
 
         // 2. Read msg
         // do not store msg on the stack to avoid overflow issues
-        // TODO: optimize with less allocations...
-        let mut node_msg: Vec<u8> = Vec::with_capacity(node_msg_len);
-        unsafe {
-            node_msg.set_len(node_msg_len);
-        }
+        let mut node_msg: Vec<u8> = vec![0; node_msg_len];
         log::debug!("Receiving msg...");
-        stream.read_exact(node_msg.as_mut_slice()).await?;
+        stream.read_exact(&mut node_msg).await?;
         log::debug!("msg received.");
         let node_msg = node_msg.into_boxed_slice();
 
@@ -411,6 +420,12 @@ where
         msg: &MultiMachineMsg<'_, I>,
     ) -> Result<(), Error> {
         let serialized_msg = msg.serialize_as_ref();
+        if serialized_msg.len() > MAX_MULTI_MACHINE_MSG_SIZE {
+            return Err(Error::illegal_argument(format!(
+                "Multi-machine message length {} exceeds limit {MAX_MULTI_MACHINE_MSG_SIZE}",
+                serialized_msg.len()
+            )));
+        }
         let msg_len = u32::to_le_bytes(serialized_msg.len() as u32);
 
         // 0. Write the dummy byte
@@ -603,5 +618,90 @@ where
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::inputs::BytesInput;
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_multi_machine_write_and_read_msg_roundtrip() {
+        let rt = Runtime::new().unwrap();
+        rt.block_on(async {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let connect_fut = TcpStream::connect(addr);
+            let (client_res, accept_res) = tokio::join!(connect_fut, listener.accept());
+            let mut client = client_res.unwrap();
+            let (mut server, _) = accept_res.unwrap();
+
+            // Empty non-blocking stream returns Ok(None).
+            assert!(
+                TcpMultiMachineState::<core::net::SocketAddr>::read_msg::<BytesInput>(&mut server)
+                    .await
+                    .unwrap()
+                    .is_none()
+            );
+
+            // Round-trip a non-empty message.
+            let payload: Vec<u8> = (0_u8..=250).collect();
+            let outgoing: MultiMachineMsg<BytesInput> =
+                MultiMachineMsg::llmp_msg(OwnedRef::Ref(payload.as_slice()));
+            TcpMultiMachineState::<core::net::SocketAddr>::write_msg(&mut client, &outgoing)
+                .await
+                .unwrap();
+
+            let recvd = loop {
+                server.readable().await.unwrap();
+                if let Some(msg) = TcpMultiMachineState::<core::net::SocketAddr>::read_msg::<
+                    BytesInput,
+                >(&mut server)
+                .await
+                .unwrap()
+                {
+                    break msg;
+                }
+            };
+            assert_eq!(recvd.serialize_as_ref(), payload.as_slice());
+
+            client.write_all(&[DUMMY_BYTE]).await.unwrap();
+            client.write_all(&u32::MAX.to_le_bytes()).await.unwrap();
+            loop {
+                server.readable().await.unwrap();
+                match TcpMultiMachineState::<core::net::SocketAddr>::read_msg::<BytesInput>(
+                    &mut server,
+                )
+                .await
+                {
+                    Ok(None) => {}
+                    res => {
+                        assert!(res.is_err());
+                        break;
+                    }
+                }
+            }
+
+            client.write_all(&[DUMMY_BYTE]).await.unwrap();
+            client.write_all(&100_u32.to_le_bytes()).await.unwrap();
+            client.write_all(&[1, 2, 3]).await.unwrap();
+            drop(client);
+            loop {
+                server.readable().await.unwrap();
+                match TcpMultiMachineState::<core::net::SocketAddr>::read_msg::<BytesInput>(
+                    &mut server,
+                )
+                .await
+                {
+                    Ok(None) => {}
+                    res => {
+                        assert!(res.is_err());
+                        break;
+                    }
+                }
+            }
+        });
     }
 }

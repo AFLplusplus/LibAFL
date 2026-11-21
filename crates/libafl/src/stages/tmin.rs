@@ -125,7 +125,7 @@ impl<E, EM, F, FF, I, M, S, Z> Named for StdTMinMutationalStage<E, EM, F, FF, I,
 }
 
 /// The counter for giving this stage unique id
-static mut TMIN_STAGE_ID: usize = 0;
+static TMIN_STAGE_ID: super::StageIdCounter = super::StageIdCounter::new();
 /// The name for tmin stage
 pub static TMIN_STAGE_NAME: &str = "tmin";
 
@@ -315,12 +315,7 @@ where
 impl<E, EM, F, FF, I, M, S, Z> StdTMinMutationalStage<E, EM, F, FF, I, M, S, Z> {
     /// Creates a new minimizing mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
-        // unsafe but impossible that you create two threads both instantiating this instance
-        let stage_id = unsafe {
-            let ret = TMIN_STAGE_ID;
-            TMIN_STAGE_ID += 1;
-            ret
-        };
+        let stage_id = TMIN_STAGE_ID.next();
         Self {
             name: Cow::Owned(TMIN_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str()),
             mutator,

@@ -41,7 +41,23 @@ pub mod unix_signal_handler {
     ) {
     }*/
 
-    #[cfg(unix)]
+    pub(crate) type PanicHandlerFuncPtr = unsafe fn(*mut InProcessExecutorHandlerData);
+
+    impl SignalHandler for crate::executors::hooks::inprocess::InProcessSignalHandler {
+        unsafe fn handle(
+            &mut self,
+            signal: Signal,
+            info: &mut siginfo_t,
+            context: Option<&mut ucontext_t>,
+        ) {
+            unsafe { handle_inprocess_signal(signal, info, context) };
+        }
+
+        fn signals(&self) -> Vec<Signal> {
+            common_signals()
+        }
+    }
+
     impl SignalHandler for InProcessExecutorHandlerData {
         /// # Safety
         /// This will access global state.
@@ -51,35 +67,7 @@ pub mod unix_signal_handler {
             info: &mut siginfo_t,
             context: Option<&mut ucontext_t>,
         ) {
-            // # Safety
-            // This runs in a signal handler, no other threads access these variables/borrows anymore.
-            unsafe {
-                let data = &raw mut GLOBAL_STATE;
-                let (max_depth_reached, signal_depth) = (*data).signal_handler_enter();
-
-                if max_depth_reached {
-                    log::error!(
-                        "The in process signal handler has been triggered {signal_depth} times recursively, which is not expected. Exiting with error code {SIGNAL_RECURSION_EXIT}..."
-                    );
-                    libc::exit(SIGNAL_RECURSION_EXIT);
-                }
-
-                match signal {
-                    Signal::SigUser2 | Signal::SigAlarm => {
-                        if !(*data).timeout_handler.is_null() {
-                            let func: HandlerFuncPtr = transmute((*data).timeout_handler);
-                            (func)(signal, info, context, data);
-                        }
-                    }
-                    _ => {
-                        if !(*data).crash_handler.is_null() {
-                            let func: HandlerFuncPtr = transmute((*data).crash_handler);
-                            func(signal, info, context, data);
-                        }
-                    }
-                }
-                (*data).signal_handler_exit();
-            }
+            unsafe { handle_inprocess_signal(signal, info, context) };
         }
 
         fn signals(&self) -> Vec<Signal> {
@@ -87,23 +75,14 @@ pub mod unix_signal_handler {
         }
     }
 
-    /// invokes the `post_exec` hook on all observer in case of panic
-    pub fn setup_panic_hook<E, EM, I, OF, S, Z>()
-    where
-        E: Executor<EM, I, S, Z> + HasObservers,
-        E::Observers: ObserversTuple<I, S>,
-        EM: EventFirer<I, S> + EventRestarter<S>,
-        OF: Feedback<EM, I, E::Observers, S>,
-        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
-        Z: HasObjective<Objective = OF>,
-        I: Input + Clone,
-    {
-        let old_hook = panic::take_hook();
+    unsafe fn handle_inprocess_signal(
+        signal: Signal,
+        info: &mut siginfo_t,
+        context: Option<&mut ucontext_t>,
+    ) {
         // # Safety
-        // The panic handler should only run when all other execution stopped.
-        // At this point, accessing the global state should be sound.
-        panic::set_hook(Box::new(move |panic_info| unsafe {
-            old_hook(panic_info);
+        // This runs in a signal handler, no other threads access these variables/borrows anymore.
+        unsafe {
             let data = &raw mut GLOBAL_STATE;
             let (max_depth_reached, signal_depth) = (*data).signal_handler_enter();
 
@@ -114,14 +93,49 @@ pub mod unix_signal_handler {
                 libc::exit(SIGNAL_RECURSION_EXIT);
             }
 
+            match signal {
+                Signal::SigUser2 | Signal::SigAlarm => {
+                    if !(*data).timeout_handler.is_null() {
+                        let func: HandlerFuncPtr = transmute((*data).timeout_handler);
+                        (func)(signal, info, context, data);
+                    }
+                }
+                _ => {
+                    if !(*data).crash_handler.is_null() {
+                        let func: HandlerFuncPtr = transmute((*data).crash_handler);
+                        func(signal, info, context, data);
+                    }
+                }
+            }
+            (*data).signal_handler_exit();
+        }
+    }
+
+    pub(crate) unsafe fn inproc_panic_handler<E, EM, I, OF, S, Z>(
+        data: *mut InProcessExecutorHandlerData,
+    ) where
+        E: Executor<EM, I, S, Z> + HasObservers,
+        E::Observers: ObserversTuple<I, S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        OF: Feedback<EM, I, E::Observers, S>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+        Z: HasObjective<Objective = OF>,
+        I: Input + Clone,
+    {
+        unsafe {
+            let (max_depth_reached, signal_depth) = (*data).signal_handler_enter();
+            if max_depth_reached {
+                log::error!(
+                    "The in process signal handler has been triggered {signal_depth} times recursively, which is not expected. Exiting with error code {SIGNAL_RECURSION_EXIT}..."
+                );
+                libc::exit(SIGNAL_RECURSION_EXIT);
+            }
             if (*data).is_valid() {
-                // We are fuzzing!
                 let executor = (*data).executor_mut::<E>();
                 let state = (*data).state_mut::<S>();
                 let input = (*data).take_current_input::<I>();
                 let fuzzer = (*data).fuzzer_mut::<Z>();
                 let event_mgr = (*data).event_mgr_mut::<EM>();
-
                 run_observers_and_save_state::<E, EM, I, OF, S, Z>(
                     executor,
                     state,
@@ -130,11 +144,47 @@ pub mod unix_signal_handler {
                     event_mgr,
                     ExitKind::Crash,
                 );
-
-                libafl_bolts::os::exit(128 + 6); // SIGABRT exit code
+                libafl_bolts::os::exit(128 + 6);
             }
-
             (*data).signal_handler_exit();
+        }
+    }
+
+    pub(crate) fn ensure_panic_hook_installed() {
+        static ONCE: std::sync::Once = std::sync::Once::new();
+        ONCE.call_once(|| {
+            let old_hook = panic::take_hook();
+            panic::set_hook(Box::new(move |panic_info| {
+                old_hook(panic_info);
+                unsafe {
+                    let data = &raw mut GLOBAL_STATE;
+                    if !(*data).panic_handler.is_null() {
+                        let func: PanicHandlerFuncPtr = transmute((*data).panic_handler);
+                        func(data);
+                    }
+                }
+            }));
+        });
+    }
+
+    /// Invokes the `post_exec` hook on all observers in case of panic.
+    ///
+    /// # Safety
+    /// Type parameters must match the concrete types stored in `GLOBAL_STATE` whenever `is_valid()` is `true`.
+    pub unsafe fn setup_panic_hook<E, EM, I, OF, S, Z>()
+    where
+        E: Executor<EM, I, S, Z> + HasObservers,
+        E::Observers: ObserversTuple<I, S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        OF: Feedback<EM, I, E::Observers, S>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+        Z: HasObjective<Objective = OF>,
+        I: Input + Clone,
+    {
+        let old_hook = panic::take_hook();
+        panic::set_hook(Box::new(move |panic_info| {
+            old_hook(panic_info);
+            unsafe { inproc_panic_handler::<E, EM, I, OF, S, Z>(&raw mut GLOBAL_STATE) };
         }));
     }
 

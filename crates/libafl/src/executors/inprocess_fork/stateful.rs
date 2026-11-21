@@ -118,6 +118,8 @@ where
                     // Child
                     self.inner.pre_run_target_child(fuzzer, state, mgr, input)?;
                     (self.harness_fn)(&mut self.executor_state, input);
+                    crate::executors::hooks::inprocess_fork::FORK_EXECUTOR_GLOBAL_DATA
+                        .leave_or_wait();
                     self.inner.post_run_target_child(fuzzer, state, mgr, input);
 
                     unreachable!(

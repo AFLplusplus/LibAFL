@@ -114,19 +114,14 @@ impl<EM, I, TE, S, Z> Named for TracingStage<EM, I, TE, S, Z> {
 }
 
 /// The counter for giving this stage unique id
-static mut TRACING_STAGE_ID: usize = 0;
+static TRACING_STAGE_ID: super::StageIdCounter = super::StageIdCounter::new();
 /// The name for tracing stage
 pub static TRACING_STAGE_NAME: &str = "tracing";
 
 impl<EM, I, TE, S, Z> TracingStage<EM, I, TE, S, Z> {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
-        // unsafe but impossible that you create two threads both instantiating this instance
-        let stage_id = unsafe {
-            let ret = TRACING_STAGE_ID;
-            TRACING_STAGE_ID += 1;
-            ret
-        };
+        let stage_id = TRACING_STAGE_ID.next();
 
         Self {
             name: Cow::Owned(TRACING_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_ref()),

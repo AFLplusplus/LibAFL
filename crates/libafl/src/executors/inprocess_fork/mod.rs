@@ -24,11 +24,12 @@ use crate::{
 };
 
 /// The signature of the crash handler function
+#[cfg_attr(miri, allow(dead_code))]
 pub(crate) type ForkHandlerFuncPtr = unsafe fn(
     Signal,
     &mut siginfo_t,
     Option<&mut ucontext_t>,
-    data: *mut InProcessForkExecutorGlobalData,
+    data: &InProcessForkExecutorGlobalData,
 );
 
 /// The inner structure of `InProcessForkExecutor`.
@@ -127,6 +128,8 @@ where
                     // Child
                     self.inner.pre_run_target_child(fuzzer, state, mgr, input)?;
                     (self.harness_fn)(input);
+                    crate::executors::hooks::inprocess_fork::FORK_EXECUTOR_GLOBAL_DATA
+                        .leave_or_wait();
                     self.inner.post_run_target_child(fuzzer, state, mgr, input);
                     Ok(ExitKind::Ok)
                 }
@@ -218,7 +221,11 @@ pub mod child_signal_handlers {
     };
 
     /// invokes the `post_exec` hook on all observer in case the child process panics
-    pub fn setup_child_panic_hook<E, I, S>()
+    ///
+    /// # Safety
+    /// Caller must ensure that `E`, `I`, and `S` match the concrete types stored in
+    /// `FORK_EXECUTOR_GLOBAL_DATA` whenever `current_input_ptr` is non-null.
+    pub unsafe fn setup_child_panic_hook<E, I, S>()
     where
         E: HasObservers,
         E::Observers: ObserversTuple<I, S>,
@@ -226,77 +233,82 @@ pub mod child_signal_handlers {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| unsafe {
             old_hook(panic_info);
-            let data = &raw mut FORK_EXECUTOR_GLOBAL_DATA;
-            if !data.is_null() && (*data).is_valid() {
-                let executor = (*data).executor_mut::<E>();
+            let data = &FORK_EXECUTOR_GLOBAL_DATA;
+            if let Some(input) = data.take_current_input::<I>() {
+                let _exit_guard = ExitOnDrop(128 + 6);
+                let executor = data.executor_mut::<E>();
                 let mut observers = executor.observers_mut();
-                let state = (*data).state_mut::<S>();
-                // Invalidate data to not execute again the observer hooks in the crash handler
-                let input = (*data).take_current_input::<I>();
+                let state = data.state_mut::<S>();
                 observers
                     .post_exec_all(state, input, &ExitKind::Crash)
                     .expect("Failed to run post_exec on observers");
-
-                // std::process::abort();
-                libc::_exit(128 + 6); // ABORT exit code
             }
         }));
+    }
+
+    struct ExitOnDrop(i32);
+
+    impl Drop for ExitOnDrop {
+        fn drop(&mut self) {
+            unsafe {
+                libc::_exit(self.0);
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    unsafe fn handle_child_signal<E, I, S>(
+        signal: Signal,
+        data: &InProcessForkExecutorGlobalData,
+        exit_kind: ExitKind,
+    ) where
+        E: HasObservers,
+        E::Observers: ObserversTuple<I, S>,
+    {
+        let _exit_guard = ExitOnDrop(128 + (signal as i32));
+        unsafe {
+            if let Some(input) = data.take_current_input::<I>() {
+                let executor = data.executor_mut::<E>();
+                let mut observers = executor.observers_mut();
+                let state = data.state_mut::<S>();
+                observers
+                    .post_exec_all(state, input, &exit_kind)
+                    .expect("Failed to run post_exec on observers");
+            }
+        }
     }
 
     /// invokes the `post_exec` hook on all observer in case the child process crashes
     ///
     /// # Safety
     /// The function should only be called from a child crash handler.
-    /// It will dereference the `data` pointer and assume it's valid.
+    /// It will dereference the `data` pointers and assume they are valid.
     #[cfg(unix)]
     #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
     pub(crate) unsafe fn child_crash_handler<E, I, S>(
-        _signal: Signal,
+        signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
-        data: &mut InProcessForkExecutorGlobalData,
+        data: &InProcessForkExecutorGlobalData,
     ) where
         E: HasObservers,
         E::Observers: ObserversTuple<I, S>,
     {
-        unsafe {
-            if data.is_valid() {
-                let executor = data.executor_mut::<E>();
-                let mut observers = executor.observers_mut();
-                let state = data.state_mut::<S>();
-                let input = data.take_current_input::<I>();
-                observers
-                    .post_exec_all(state, input, &ExitKind::Crash)
-                    .expect("Failed to run post_exec on observers");
-            }
-
-            libc::_exit(128 + (_signal as i32));
-        }
+        unsafe { handle_child_signal::<E, I, S>(signal, data, ExitKind::Crash) };
     }
 
     #[cfg(unix)]
     #[allow(clippy::needless_pass_by_value)] // nightly no longer requires this
     pub(crate) unsafe fn child_timeout_handler<E, I, S>(
-        #[cfg(unix)] _signal: Signal,
+        signal: Signal,
         _info: &mut siginfo_t,
         _context: Option<&mut ucontext_t>,
-        data: &mut InProcessForkExecutorGlobalData,
+        data: &InProcessForkExecutorGlobalData,
     ) where
         E: HasObservers,
         E::Observers: ObserversTuple<I, S>,
     {
-        unsafe {
-            if data.is_valid() {
-                let executor = data.executor_mut::<E>();
-                let mut observers = executor.observers_mut();
-                let state = data.state_mut::<S>();
-                let input = data.take_current_input::<I>();
-                observers
-                    .post_exec_all(state, input, &ExitKind::Timeout)
-                    .expect("Failed to run post_exec on observers");
-            }
-            libc::_exit(128 + (_signal as i32));
-        }
+        unsafe { handle_child_signal::<E, I, S>(signal, data, ExitKind::Timeout) };
     }
 }
 
@@ -389,5 +401,30 @@ mod tests {
         in_process_fork_executor
             .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();
+    }
+
+    #[test]
+    fn test_fork_global_data_take_current_input_is_single_claim() {
+        use core::ptr::{from_ref, null_mut};
+        use core::sync::atomic::Ordering;
+
+        use crate::executors::hooks::inprocess_fork::FORK_EXECUTOR_GLOBAL_DATA;
+
+        // Repeated/idle `leave_or_wait()` must return immediately without hanging.
+        FORK_EXECUTOR_GLOBAL_DATA
+            .current_input_ptr
+            .store(null_mut(), Ordering::Release);
+        FORK_EXECUTOR_GLOBAL_DATA.leave_or_wait();
+        FORK_EXECUTOR_GLOBAL_DATA.leave_or_wait();
+
+        let input = NopInput {};
+        FORK_EXECUTOR_GLOBAL_DATA
+            .current_input_ptr
+            .store(from_ref(&input).cast_mut().cast(), Ordering::Release);
+        assert!(unsafe { FORK_EXECUTOR_GLOBAL_DATA.take_current_input::<NopInput>() }.is_some());
+        assert!(unsafe { FORK_EXECUTOR_GLOBAL_DATA.take_current_input::<NopInput>() }.is_none());
+        FORK_EXECUTOR_GLOBAL_DATA
+            .current_input_ptr
+            .store(null_mut(), Ordering::Release);
     }
 }

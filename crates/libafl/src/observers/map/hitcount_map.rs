@@ -3,9 +3,7 @@ use alloc::{borrow::Cow, vec::Vec};
 use core::{
     fmt::Debug,
     hash::Hash,
-    mem::size_of,
     ops::{Deref, DerefMut},
-    slice,
 };
 
 use libafl_bolts::{AsIter, AsIterMut, HasLen, Named, ToSlice, ToSliceMut, Truncate};
@@ -54,41 +52,17 @@ static COUNT_CLASS_LOOKUP_16: [u16; 256 * 256] = {
 
 /// AFL-style classify counts
 #[inline]
-#[expect(clippy::cast_ptr_alignment)]
 pub(crate) fn classify_counts(map: &mut [u8]) {
-    let mut len = map.len();
-    let align_offset = map.as_ptr().align_offset(size_of::<u16>());
-
-    // if len == 1, the next branch will already do this lookup
-    if len > 1 && align_offset != 0 {
-        debug_assert_eq!(
-            align_offset, 1,
-            "Aligning u8 to u16 should always be offset of 1?"
-        );
-        unsafe {
-            *map.get_unchecked_mut(0) =
-                *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(0) as usize);
-        }
-        len -= 1;
+    // SAFETY: `u16` is valid for any bit pattern.
+    let (prefix, aligned, suffix) = unsafe { map.align_to_mut::<u16>() };
+    for item in prefix {
+        *item = COUNT_CLASS_LOOKUP[*item as usize];
     }
-
-    // Fix the last element
-    if (len & 1) != 0 {
-        unsafe {
-            *map.get_unchecked_mut(len - 1) =
-                *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(len - 1) as usize);
-        }
+    for item in aligned {
+        *item = COUNT_CLASS_LOOKUP_16[*item as usize];
     }
-
-    let cnt = len / 2;
-
-    let map16 =
-        unsafe { slice::from_raw_parts_mut(map.as_mut_ptr().add(align_offset) as *mut u16, cnt) };
-
-    for item in &mut map16[0..cnt] {
-        unsafe {
-            *item = *(COUNT_CLASS_LOOKUP_16).get_unchecked(*item as usize);
-        }
+    for item in suffix {
+        *item = COUNT_CLASS_LOOKUP[*item as usize];
     }
 }
 
@@ -496,5 +470,36 @@ where
 
     fn as_iter_mut(&'it mut self) -> Self::IntoIterMut {
         self.base.as_iter_mut()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{COUNT_CLASS_LOOKUP, classify_counts};
+
+    #[test]
+    fn test_classify_counts_unaligned_and_odd_lengths() {
+        #[repr(align(2))]
+        struct AlignedBuf([u8; 32]);
+
+        classify_counts(&mut []);
+
+        let raw: [u8; 20] = [
+            0, 1, 2, 3, 4, 7, 8, 15, 16, 31, 32, 64, 127, 128, 200, 255, 0, 1, 5, 99,
+        ];
+        for start in [0usize, 1usize] {
+            for len in [0usize, 1, 2, 3, 7, 8, 9, 15, 16, 17, 19] {
+                let mut aligned = AlignedBuf([0u8; 32]);
+                aligned.0[start..start + len].copy_from_slice(&raw[..len]);
+                classify_counts(&mut aligned.0[start..start + len]);
+                for i in 0..len {
+                    assert_eq!(
+                        aligned.0[start + i],
+                        COUNT_CLASS_LOOKUP[raw[i] as usize],
+                        "mismatch at start={start}, len={len}, i={i}"
+                    );
+                }
+            }
+        }
     }
 }

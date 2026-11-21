@@ -327,7 +327,46 @@ where
     }
 }
 
-static mut CLOSURE_STAGE_ID: usize = 0;
+/// Counter for unique stage IDs across both atomic and single-core `no_std` targets (e.g. `thumbv6m`).
+pub(crate) struct StageIdCounter {
+    #[cfg(target_has_atomic = "ptr")]
+    inner: core::sync::atomic::AtomicUsize,
+    #[cfg(not(target_has_atomic = "ptr"))]
+    inner: core::cell::UnsafeCell<usize>,
+}
+
+// SAFETY: Targets without pointer-sized atomics (such as `thumbv6m-none-eabi`) are single-core.
+#[cfg(not(target_has_atomic = "ptr"))]
+unsafe impl Sync for StageIdCounter {}
+
+impl StageIdCounter {
+    pub(crate) const fn new() -> Self {
+        Self {
+            #[cfg(target_has_atomic = "ptr")]
+            inner: core::sync::atomic::AtomicUsize::new(0),
+            #[cfg(not(target_has_atomic = "ptr"))]
+            inner: core::cell::UnsafeCell::new(0),
+        }
+    }
+
+    #[inline]
+    pub(crate) fn next(&self) -> usize {
+        #[cfg(target_has_atomic = "ptr")]
+        {
+            self.inner
+                .fetch_add(1, core::sync::atomic::Ordering::Relaxed)
+        }
+        #[cfg(not(target_has_atomic = "ptr"))]
+        unsafe {
+            let ptr = self.inner.get();
+            let id = ptr.read();
+            ptr.write(id.wrapping_add(1));
+            id
+        }
+    }
+}
+
+static CLOSURE_STAGE_ID: StageIdCounter = StageIdCounter::new();
 /// The name for closure stage
 pub static CLOSURE_STAGE_NAME: &str = "closure";
 
@@ -383,12 +422,7 @@ impl<CB, E, EM, Z> ClosureStage<CB, E, EM, Z> {
     /// Create a new [`ClosureStage`]
     #[must_use]
     pub fn new(closure: CB) -> Self {
-        // unsafe but impossible that you create two threads both instantiating this instance
-        let stage_id = unsafe {
-            let ret = CLOSURE_STAGE_ID;
-            CLOSURE_STAGE_ID += 1;
-            ret
-        };
+        let stage_id = CLOSURE_STAGE_ID.next();
         Self {
             name: Cow::Owned(CLOSURE_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_ref()),
             closure,
@@ -655,5 +689,16 @@ mod test {
         RetryCountRestartHelper::clear_progress(&mut state, stage.name())?;
 
         Ok(())
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_stage_id_counter_concurrent() {
+        let counter = super::StageIdCounter::new();
+        let ids: hashbrown::HashSet<usize> = std::thread::scope(|s| {
+            let handles: alloc::vec::Vec<_> = (0..8).map(|_| s.spawn(|| counter.next())).collect();
+            handles.into_iter().map(|h| h.join().unwrap()).collect()
+        });
+        assert_eq!(ids.len(), 8);
     }
 }

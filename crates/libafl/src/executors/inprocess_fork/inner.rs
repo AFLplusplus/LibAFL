@@ -2,8 +2,8 @@ use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::{self, null_mut, write_volatile},
-    sync::atomic::{Ordering, compiler_fence},
+    ptr::{self, null_mut},
+    sync::atomic::Ordering,
     time::Duration,
 };
 
@@ -120,12 +120,20 @@ where
         unsafe {
             self.shmem_provider.post_fork(true)?;
 
-            self.enter_target(fuzzer, state, mgr, input);
-            self.hooks.pre_exec_all(state, input);
-
             self.observers
                 .pre_exec_all(state, input)
                 .expect("Failed to run pre_exec on observers");
+
+            self.hooks.pre_exec_all(state, input);
+            #[cfg(target_os = "linux")]
+            let itimerspec = self.itimerspec;
+            #[cfg(not(target_os = "linux"))]
+            let mut itimerval = self.itimerval;
+
+            // `enter_target` must be the final access to `self` before the harness runs so
+            // Stacked/Tree Borrows keeps `FORK_EXECUTOR_GLOBAL_DATA.executor_ptr` valid over the
+            // entire `GenericInProcessForkExecutorInner` struct.
+            self.enter_target(fuzzer, state, mgr, input);
 
             #[cfg(target_os = "linux")]
             {
@@ -134,12 +142,12 @@ where
                 // we can't do this from the parent, timerid is unique to each process.
                 libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), &raw mut timerid);
 
-                // log::info!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
-                let _: i32 = libc::timer_settime(timerid, 0, &raw mut self.itimerspec, null_mut());
+                // log::info!("Set timer! {:#?} {timerid:#?}", itimerspec);
+                libc::timer_settime(timerid, 0, &raw const itimerspec, null_mut());
             }
             #[cfg(not(target_os = "linux"))]
             {
-                setitimer(ITIMER_REAL, &raw mut self.itimerval, null_mut());
+                setitimer(ITIMER_REAL, &raw mut itimerval, null_mut());
             }
             // log::trace!("{v:#?} {}", nix::errno::errno());
 
@@ -155,12 +163,12 @@ where
         input: &I,
     ) {
         unsafe {
+            self.leave_target(fuzzer, state, mgr, input);
+            self.hooks.post_exec_all(state, input);
+
             self.observers
                 .post_exec_all(state, input, &ExitKind::Ok)
                 .expect("Failed to run post_exec on observers");
-
-            self.hooks.post_exec_all(state, input);
-            self.leave_target(fuzzer, state, mgr, input);
 
             libc::_exit(0);
         }
@@ -206,23 +214,27 @@ where
 {
     #[inline]
     /// This function marks the boundary between the fuzzer and the target.
-    pub fn enter_target(&mut self, _fuzzer: &mut Z, state: &mut S, _event_mgr: &mut EM, input: &I) {
-        unsafe {
-            let data = &raw mut FORK_EXECUTOR_GLOBAL_DATA;
-            write_volatile(
-                &raw mut (*data).executor_ptr,
-                ptr::from_ref(self) as *const c_void,
-            );
-            write_volatile(
-                &raw mut (*data).current_input_ptr,
-                ptr::from_ref(input) as *const c_void,
-            );
-            write_volatile(
-                &raw mut ((*data).state_ptr),
-                ptr::from_mut(state) as *mut c_void,
-            );
-            compiler_fence(Ordering::SeqCst);
-        }
+    ///
+    /// # Safety
+    /// `Self`, `S`, and `I` must match the concrete types registered in [`InChildProcessHooks::new`],
+    /// and `self`, `state`, and `input` must remain valid and unaliased until [`Self::leave_target`].
+    pub unsafe fn enter_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        state: &mut S,
+        _event_mgr: &mut EM,
+        input: &I,
+    ) {
+        FORK_EXECUTOR_GLOBAL_DATA
+            .executor_ptr
+            .store(ptr::from_mut(self).cast::<c_void>(), Ordering::Release);
+        FORK_EXECUTOR_GLOBAL_DATA
+            .state_ptr
+            .store(ptr::from_mut(state).cast::<c_void>(), Ordering::Release);
+        FORK_EXECUTOR_GLOBAL_DATA.current_input_ptr.store(
+            ptr::from_ref(input).cast_mut().cast::<c_void>(),
+            Ordering::Release,
+        );
     }
 
     #[inline]
@@ -234,7 +246,7 @@ where
         _event_mgr: &mut EM,
         _input: &I,
     ) {
-        // do nothing
+        FORK_EXECUTOR_GLOBAL_DATA.leave_or_wait();
     }
 
     /// Creates a new [`GenericInProcessForkExecutorInner`] with custom hooks

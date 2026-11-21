@@ -216,12 +216,7 @@ impl<CS, EM, I, OT, PS, Z> PushStageAdapter<CS, EM, I, OT, PS, Z> {
     /// to be used as a normal [`Stage`]
     #[must_use]
     pub fn new(push_stage: PS) -> Self {
-        // unsafe but impossible that you create two threads both instantiating this instance
-        let stage_id = unsafe {
-            let ret = PUSH_STAGE_ADAPTER_ID;
-            PUSH_STAGE_ADAPTER_ID += 1;
-            ret
-        };
+        let stage_id = PUSH_STAGE_ADAPTER_ID.next();
         Self {
             name: Cow::Owned(
                 PUSH_STAGE_ADAPTER_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
@@ -232,7 +227,7 @@ impl<CS, EM, I, OT, PS, Z> PushStageAdapter<CS, EM, I, OT, PS, Z> {
     }
 }
 /// The unique counter for this stage
-static mut PUSH_STAGE_ADAPTER_ID: usize = 0;
+static PUSH_STAGE_ADAPTER_ID: crate::stages::StageIdCounter = crate::stages::StageIdCounter::new();
 /// The name for push stage adapter
 pub static PUSH_STAGE_ADAPTER_NAME: &str = "pushstageadapter";
 

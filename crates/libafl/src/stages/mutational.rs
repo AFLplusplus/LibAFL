@@ -131,7 +131,7 @@ where
 }
 
 /// The unique id for mutational stage
-static mut MUTATIONAL_STAGE_ID: usize = 0;
+static MUTATIONAL_STAGE_ID: super::StageIdCounter = super::StageIdCounter::new();
 /// The name for mutational stage
 pub static MUTATIONAL_STAGE_NAME: &str = "mutational";
 
@@ -217,11 +217,7 @@ where
     /// Creates a new transforming mutational stage with the given max iterations
     #[inline]
     pub fn transforming_with_max_iterations(mutator: M, max_iterations: NonZeroUsize) -> Self {
-        let stage_id = unsafe {
-            let ret = MUTATIONAL_STAGE_ID;
-            MUTATIONAL_STAGE_ID += 1;
-            ret
-        };
+        let stage_id = MUTATIONAL_STAGE_ID.next();
         let name =
             Cow::Owned(MUTATIONAL_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str());
         Self {
@@ -299,7 +295,7 @@ pub struct MultiMutationalStage<E, EM, I, M, S, Z> {
 }
 
 /// The unique id for multi mutational stage
-static mut MULTI_MUTATIONAL_STAGE_ID: usize = 0;
+static MULTI_MUTATIONAL_STAGE_ID: super::StageIdCounter = super::StageIdCounter::new();
 /// The name for multi mutational stage
 pub static MULTI_MUTATIONAL_STAGE_NAME: &str = "multimutational";
 
@@ -369,12 +365,7 @@ impl<E, EM, I, M, S, Z> MultiMutationalStage<E, EM, I, M, S, Z> {
 impl<E, EM, I, M, S, Z> MultiMutationalStage<E, EM, I, M, S, Z> {
     /// Creates a new transforming mutational stage
     pub fn transforming(mutator: M) -> Self {
-        // unsafe but impossible that you create two threads both instantiating this instance
-        let stage_id = unsafe {
-            let ret = MULTI_MUTATIONAL_STAGE_ID;
-            MULTI_MUTATIONAL_STAGE_ID += 1;
-            ret
-        };
+        let stage_id = MULTI_MUTATIONAL_STAGE_ID.next();
         Self {
             name: Cow::Owned(
                 MULTI_MUTATIONAL_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str(),

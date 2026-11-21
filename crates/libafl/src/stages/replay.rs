@@ -104,7 +104,7 @@ impl ReplayRestarterMetadata {
 }
 
 /// The counter for giving this stage unique id
-static mut REPLAY_STAGE_ID: usize = 0;
+static REPLAY_STAGE_ID: super::StageIdCounter = super::StageIdCounter::new();
 /// The name for tracing stage
 pub static REPLAY_STAGE_NAME: &str = "tracing";
 
@@ -112,12 +112,7 @@ impl<I> ReplayStage<(), I> {
     #[must_use]
     /// Create a new replay stage
     pub fn new() -> Self {
-        // unsafe but impossible that you create two threads both instantiating this instance
-        let stage_id = unsafe {
-            let ret = REPLAY_STAGE_ID;
-            REPLAY_STAGE_ID += 1;
-            ret
-        };
+        let stage_id = REPLAY_STAGE_ID.next();
 
         Self {
             name: Cow::Owned(REPLAY_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_ref()),
@@ -131,12 +126,7 @@ impl<H, I> ReplayStage<H, I> {
     #[must_use]
     /// Create a new replay stage with a hook
     pub fn with_hook(hook: H) -> Self {
-        // unsafe but impossible that you create two threads both instantiating this instance
-        let stage_id = unsafe {
-            let ret = REPLAY_STAGE_ID;
-            REPLAY_STAGE_ID += 1;
-            ret
-        };
+        let stage_id = REPLAY_STAGE_ID.next();
 
         Self {
             name: Cow::Owned(REPLAY_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_ref()),

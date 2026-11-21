@@ -160,6 +160,28 @@ pub mod windows_exception_handler {
     ) {
     }*/
 
+    pub(crate) type PanicHandlerFuncPtr = unsafe fn(*mut InProcessExecutorHandlerData);
+
+    fn inproc_exceptions() -> Vec<ExceptionCode> {
+        let crash_list = CRASH_EXCEPTIONS.to_vec();
+        assert!(crash_list.len() < EXCEPTION_HANDLERS_SIZE - 1);
+        crash_list
+    }
+
+    impl ExceptionHandler for crate::executors::hooks::inprocess::InProcessSignalHandler {
+        unsafe fn handle(
+            &mut self,
+            _code: ExceptionCode,
+            exception_pointers: *mut EXCEPTION_POINTERS,
+        ) {
+            unsafe { handle_inprocess_exception(exception_pointers) };
+        }
+
+        fn exceptions(&self) -> Vec<ExceptionCode> {
+            inproc_exceptions()
+        }
+    }
+
     impl ExceptionHandler for InProcessExecutorHandlerData {
         /// # Safety
         /// Will dereference `EXCEPTION_POINTERS` and access `GLOBAL_STATE`.
@@ -168,36 +190,103 @@ pub mod windows_exception_handler {
             _code: ExceptionCode,
             exception_pointers: *mut EXCEPTION_POINTERS,
         ) {
-            unsafe {
-                let data = &raw mut GLOBAL_STATE;
-                let (max_depth_reached, _signal_depth) = (*data).signal_handler_enter();
-
-                if max_depth_reached {
-                    log::error!("We crashed inside a crash handler, but this should never happen!");
-                    ExitProcess(SIGNAL_RECURSION_EXIT as u32);
-                }
-
-                if !(*data).crash_handler.is_null() {
-                    let func: HandlerFuncPtr = transmute((*data).crash_handler);
-                    (func)(exception_pointers, data);
-                }
-                (*data).signal_handler_exit();
-            }
+            unsafe { handle_inprocess_exception(exception_pointers) };
         }
 
         fn exceptions(&self) -> Vec<ExceptionCode> {
-            let crash_list = CRASH_EXCEPTIONS.to_vec();
-            assert!(crash_list.len() < EXCEPTION_HANDLERS_SIZE - 1);
-            crash_list
+            inproc_exceptions()
         }
     }
 
-    /// invokes the `post_exec` hook on all observer in case of panic
+    unsafe fn handle_inprocess_exception(exception_pointers: *mut EXCEPTION_POINTERS) {
+        unsafe {
+            let data = &raw mut GLOBAL_STATE;
+            let (max_depth_reached, _signal_depth) = (*data).signal_handler_enter();
+
+            if max_depth_reached {
+                log::error!("We crashed inside a crash handler, but this should never happen!");
+                ExitProcess(SIGNAL_RECURSION_EXIT as u32);
+            }
+
+            if !(*data).crash_handler.is_null() {
+                let func: HandlerFuncPtr = transmute((*data).crash_handler);
+                (func)(exception_pointers, data);
+            }
+            (*data).signal_handler_exit();
+        }
+    }
+
+    #[cfg(feature = "std")]
+    pub(crate) unsafe fn inproc_panic_handler<E, EM, I, OF, S, Z>(
+        data: *mut InProcessExecutorHandlerData,
+    ) where
+        E: Executor<EM, I, S, Z> + HasObservers,
+        E::Observers: ObserversTuple<I, S>,
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        I: Input + Clone,
+        OF: Feedback<EM, I, E::Observers, S>,
+        S: HasExecutions + HasSolutions<I> + HasCurrentTestcase<I>,
+        Z: HasObjective<Objective = OF>,
+    {
+        unsafe {
+            let (max_depth_reached, _signal_depth) = (*data).signal_handler_enter();
+            if max_depth_reached {
+                log::error!("We crashed inside a crash handler, but this should never happen!");
+                ExitProcess(SIGNAL_RECURSION_EXIT as u32);
+            }
+            if (*data).ptp_timer.is_some() {
+                compiler_fence(Ordering::SeqCst);
+                EnterCriticalSection((*data).critical as *mut CRITICAL_SECTION);
+                compiler_fence(Ordering::SeqCst);
+                (*data).in_target = 0;
+                compiler_fence(Ordering::SeqCst);
+                LeaveCriticalSection((*data).critical as *mut CRITICAL_SECTION);
+                compiler_fence(Ordering::SeqCst);
+            }
+            if (*data).is_valid() {
+                let executor = (*data).executor_mut::<E>();
+                let state = (*data).state_mut::<S>();
+                let fuzzer = (*data).fuzzer_mut::<Z>();
+                let event_mgr = (*data).event_mgr_mut::<EM>();
+                let input = (*data).take_current_input::<I>();
+                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Crash,
+                );
+                libafl_bolts::os::exit(1);
+            }
+            (*data).signal_handler_exit();
+        }
+    }
+
+    #[cfg(feature = "std")]
+    pub(crate) fn ensure_panic_hook_installed() {
+        static ONCE: std::sync::Once = std::sync::Once::new();
+        ONCE.call_once(|| {
+            let old_hook = panic::take_hook();
+            panic::set_hook(Box::new(move |panic_info| {
+                unsafe {
+                    let data = &raw mut GLOBAL_STATE;
+                    if !(*data).panic_handler.is_null() {
+                        let func: PanicHandlerFuncPtr = transmute((*data).panic_handler);
+                        func(data);
+                    }
+                }
+                old_hook(panic_info);
+            }));
+        });
+    }
+
+    /// Invokes the `post_exec` hook on all observers in case of panic.
     ///
     /// # Safety
-    /// Well, exception handling is not safe
+    /// Type parameters must match the concrete types stored in `GLOBAL_STATE` whenever `is_valid()` is `true`.
     #[cfg(feature = "std")]
-    pub fn setup_panic_hook<E, EM, I, OF, S, Z>()
+    pub unsafe fn setup_panic_hook<E, EM, I, OF, S, Z>()
     where
         E: Executor<EM, I, S, Z> + HasObservers,
         E::Observers: ObserversTuple<I, S>,
@@ -208,53 +297,9 @@ pub mod windows_exception_handler {
         Z: HasObjective<Objective = OF>,
     {
         let old_hook = panic::take_hook();
-        panic::set_hook(Box::new(move |panic_info| unsafe {
-            let data = &raw mut GLOBAL_STATE;
-            let (max_depth_reached, _signal_depth) = (*data).signal_handler_enter();
-
-            if max_depth_reached {
-                log::error!("We crashed inside a crash handler, but this should never happen!");
-                ExitProcess(SIGNAL_RECURSION_EXIT as u32);
-            }
-
-            // Have we set a timer_before?
-            if (*data).ptp_timer.is_some() {
-                /*
-                    We want to prevent the timeout handler being run while the main thread is executing the crash handler
-                    Timeout handler runs if it has access to the critical section or data.in_target == 0
-                    Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
-                */
-                compiler_fence(Ordering::SeqCst);
-                EnterCriticalSection((*data).critical as *mut CRITICAL_SECTION);
-                compiler_fence(Ordering::SeqCst);
-                (*data).in_target = 0;
-                compiler_fence(Ordering::SeqCst);
-                LeaveCriticalSection((*data).critical as *mut CRITICAL_SECTION);
-                compiler_fence(Ordering::SeqCst);
-            }
-
-            if (*data).is_valid() {
-                // We are fuzzing!
-                let executor = (*data).executor_mut::<E>();
-                let state = (*data).state_mut::<S>();
-                let fuzzer = (*data).fuzzer_mut::<Z>();
-                let event_mgr = (*data).event_mgr_mut::<EM>();
-
-                let input = (*data).take_current_input::<I>();
-
-                run_observers_and_save_state::<E, EM, I, OF, S, Z>(
-                    executor,
-                    state,
-                    input,
-                    fuzzer,
-                    event_mgr,
-                    ExitKind::Crash,
-                );
-
-                libafl_bolts::os::exit(1);
-            }
+        panic::set_hook(Box::new(move |panic_info| {
+            unsafe { inproc_panic_handler::<E, EM, I, OF, S, Z>(&raw mut GLOBAL_STATE) };
             old_hook(panic_info);
-            (*data).signal_handler_exit();
         }));
     }
 

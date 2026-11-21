@@ -2,7 +2,6 @@ use alloc::{sync::Arc, vec::Vec};
 use core::{
     fmt::{Debug, Display},
     marker::PhantomData,
-    slice,
 };
 
 #[cfg(feature = "llmp_compression")]
@@ -12,7 +11,6 @@ use libafl_bolts::{
     llmp::{Flags, LLMP_FLAG_FROM_MM, LlmpBrokerInner, LlmpHook, LlmpMsgHookResult, Tag},
     ownedref::OwnedRef,
 };
-use send_wrapper::SendWrapper;
 use serde::Serialize;
 use tokio::{
     net::ToSocketAddrs,
@@ -128,38 +126,18 @@ where
         _new_msgs: &mut Vec<(Tag, Flags, Vec<u8>)>,
     ) -> Result<LlmpMsgHookResult, Error> {
         let shared_state = self.shared_state.clone();
-
-        let msg_lock = SendWrapper::new((msg.as_ptr(), msg.len()));
-        // let flags = msg_flags.clone();
+        let msg_bytes: Vec<u8> = msg.to_vec();
 
         let _handle: JoinHandle<Result<(), Error>> = self.rt.spawn(async move {
             let mut state_wr_lock = shared_state.write().await;
-            let (msg_ptr, msg_len) = *msg_lock;
-            let msg: &[u8] = unsafe { slice::from_raw_parts(msg_ptr, msg_len) }; // most likely crash here
-
-            // #[cfg(not(feature = "llmp_compression"))]
-            // let event_bytes = msg;
-            // #[cfg(feature = "llmp_compression")]
-            // let compressed;
-            // #[cfg(feature = "llmp_compression")]
-            // let event_bytes = if flags & LLMP_FLAG_COMPRESSED == LLMP_FLAG_COMPRESSED {
-            //     compressed = state_wr_lock.compressor().decompress(msg)?;
-            //     &compressed
-            // } else {
-            //     &*msg
-            // };
-            // let event: Event<I> = postcard::from_bytes(event_bytes)?;
-
-            let mm_msg: MultiMachineMsg<I> = MultiMachineMsg::llmp_msg(OwnedRef::Ref(msg));
-
-            // TODO: do not copy here
-            state_wr_lock.add_past_msg(msg);
 
             log::debug!("Sending msg...");
-
+            let mm_msg =
+                MultiMachineMsg::<crate::inputs::NopInput>::llmp_msg(OwnedRef::Ref(&msg_bytes));
             state_wr_lock
                 .send_interesting_event_to_nodes(&mm_msg)
                 .await?;
+            state_wr_lock.add_past_msg_owned(msg_bytes);
 
             log::debug!("msg sent.");
 

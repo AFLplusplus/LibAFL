@@ -41,7 +41,7 @@ where
 }
 
 /// The counter for giving this stage unique id
-static mut SHADOW_TRACING_STAGE_ID: usize = 0;
+static SHADOW_TRACING_STAGE_ID: super::StageIdCounter = super::StageIdCounter::new();
 /// Name for shadow tracing stage
 pub static SHADOW_TRACING_STAGE_NAME: &str = "shadow";
 
@@ -123,12 +123,7 @@ where
 {
     /// Creates a new default stage
     pub fn new() -> Self {
-        // unsafe but impossible that you create two threads both instantiating this instance
-        let stage_id = unsafe {
-            let ret = SHADOW_TRACING_STAGE_ID;
-            SHADOW_TRACING_STAGE_ID += 1;
-            ret
-        };
+        let stage_id = SHADOW_TRACING_STAGE_ID.next();
         Self {
             name: Cow::Owned(
                 SHADOW_TRACING_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str(),

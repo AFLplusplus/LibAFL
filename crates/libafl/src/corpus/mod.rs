@@ -73,15 +73,8 @@ impl From<CorpusId> for usize {
 macro_rules! random_corpus_id {
     ($corpus:expr, $rand:expr) => {{
         let cnt = $corpus.count();
-        #[cfg(debug_assertions)]
-        let nth = $rand.below(core::num::NonZero::new(cnt).expect("Corpus may not be empty!"));
-        // # Safety
-        // This is a hot path. We try to be as fast as possible here.
-        // In debug this is checked (see above.)
-        // The worst that can happen is a wrong integer to get returned.
-        // In this case, the call below will fail.
-        #[cfg(not(debug_assertions))]
-        let nth = $rand.below(unsafe { core::num::NonZero::new_unchecked(cnt) });
+        debug_assert!(cnt != 0, "Corpus may not be empty!");
+        let nth = $rand.below_or_zero(cnt);
         $corpus.nth(nth)
     }};
 }
@@ -92,15 +85,8 @@ macro_rules! random_corpus_id {
 macro_rules! random_corpus_id_with_disabled {
     ($corpus:expr, $rand:expr) => {{
         let cnt = $corpus.count_all();
-        #[cfg(debug_assertions)]
-        let nth = $rand.below(core::num::NonZero::new(cnt).expect("Corpus may not be empty!"));
-        // # Safety
-        // This is a hot path. We try to be as fast as possible here.
-        // In debug this is checked (see above.)
-        // The worst that can happen is a wrong integer to get returned.
-        // In this case, the call below will fail.
-        #[cfg(not(debug_assertions))]
-        let nth = $rand.below(unsafe { core::num::NonZero::new_unchecked(cnt) });
+        debug_assert!(cnt != 0, "Corpus may not be empty!");
+        let nth = $rand.below_or_zero(cnt);
         $corpus.nth_from_all(nth)
     }};
 }
@@ -257,5 +243,49 @@ where
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use libafl_bolts::rands::{Rand, StdRand};
+
+    use crate::{
+        corpus::{Corpus, InMemoryCorpus, Testcase},
+        inputs::BytesInput,
+    };
+
+    #[test]
+    fn test_random_corpus_id_non_empty() {
+        let mut corpus = InMemoryCorpus::new();
+        let id0 = corpus.add(Testcase::new(BytesInput::new(vec![1]))).unwrap();
+        let id1 = corpus
+            .add_disabled(Testcase::new(BytesInput::new(vec![2])))
+            .unwrap();
+        let mut rand = StdRand::with_seed(42);
+
+        for _ in 0..16 {
+            assert_eq!(random_corpus_id!(corpus, rand), id0);
+            let any = random_corpus_id_with_disabled!(corpus, rand);
+            assert!(any == id0 || any == id1);
+        }
+    }
+
+    #[test]
+    #[cfg_attr(debug_assertions, should_panic(expected = "Corpus may not be empty!"))]
+    #[cfg_attr(not(debug_assertions), should_panic(expected = "index out of bounds"))]
+    fn test_random_corpus_id_empty_panics_cleanly() {
+        let corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
+        let mut rand = StdRand::with_seed(42);
+        let _unused = random_corpus_id!(corpus, rand);
+    }
+
+    #[test]
+    #[cfg_attr(debug_assertions, should_panic(expected = "Corpus may not be empty!"))]
+    #[cfg_attr(not(debug_assertions), should_panic(expected = "index out of bounds"))]
+    fn test_random_corpus_id_with_disabled_empty_panics_cleanly() {
+        let corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
+        let mut rand = StdRand::with_seed(42);
+        let _unused = random_corpus_id_with_disabled!(corpus, rand);
     }
 }

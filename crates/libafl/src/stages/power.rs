@@ -27,7 +27,7 @@ use crate::{
 };
 
 /// The unique id for this stage
-static mut POWER_MUTATIONAL_STAGE_ID: usize = 0;
+static POWER_MUTATIONAL_STAGE_ID: super::StageIdCounter = super::StageIdCounter::new();
 /// Default name for `PowerMutationalStage`; derived from AFL++
 pub const POWER_MUTATIONAL_STAGE_NAME: &str = "power";
 /// The mutational stage using power schedules
@@ -128,12 +128,7 @@ where
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M) -> Self {
-        // unsafe but impossible that you create two threads both instantiating this instance
-        let stage_id = unsafe {
-            let ret = POWER_MUTATIONAL_STAGE_ID;
-            POWER_MUTATIONAL_STAGE_ID += 1;
-            ret
-        };
+        let stage_id = POWER_MUTATIONAL_STAGE_ID.next();
         Self {
             name: Cow::Owned(
                 POWER_MUTATIONAL_STAGE_NAME.to_owned() + ":" + stage_id.to_string().as_str(),
