@@ -141,7 +141,8 @@ pub unsafe fn inproc_qemu_crash_handler<E, EM, ET, I, OF, S, Z>(
             let si_addr = unsafe { info.si_addr() as usize };
             log::error!("The fuzzer crashed at addr 0x{si_addr:x}... Bug in the fuzzer? Exiting.");
 
-            let bsod = minibsod::generate_minibsod_to_vec(signal, info, context.as_deref());
+            let bsod =
+                unsafe { minibsod::generate_minibsod_to_vec(signal, info, context.as_deref()) };
 
             if let Ok(bsod) = bsod {
                 if let Ok(bsod_str) = str::from_utf8(&bsod) {

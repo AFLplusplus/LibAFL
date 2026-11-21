@@ -63,7 +63,6 @@ use libc::siginfo_t;
 #[cfg(target_vendor = "apple")]
 use mach2::{
     message::mach_msg_type_number_t,
-    port::mach_port_t,
     traps::mach_task_self,
     vm::mach_vm_region_recurse,
     vm_region::{vm_region_recurse_info_t, vm_region_submap_info_64},
@@ -206,7 +205,7 @@ pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    let mcontext = unsafe { &*ucontext.uc_mcontext };
+    let mcontext = &ucontext.uc_mcontext;
     for reg in 0..29_u8 {
         writeln!(
             writer,
@@ -224,11 +223,21 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
+///
+/// # Safety
+/// If `ucontext.uc_mcontext` is non-null and aligned, it must point to a valid, initialized
+/// mcontext instance for the duration of this call.
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-pub fn dump_registers<W: Write>(
+pub unsafe fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
+    if ucontext.uc_mcontext.is_null() || !ucontext.uc_mcontext.is_aligned() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "ucontext.uc_mcontext is null or unaligned",
+        ));
+    }
     let mcontext = unsafe { &*ucontext.uc_mcontext };
     for reg in 0..29_u8 {
         writeln!(
@@ -248,12 +257,21 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
-#[expect(clippy::unnecessary_wraps, clippy::similar_names)]
+///
+/// # Safety
+/// If `ucontext.uc_mcontext` is non-null and aligned, it must point to a valid, initialized
+/// mcontext instance for the duration of this call.
 #[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
-pub fn dump_registers<W: Write>(
+pub unsafe fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
+    if ucontext.uc_mcontext.is_null() || !ucontext.uc_mcontext.is_aligned() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "ucontext.uc_mcontext is null or unaligned",
+        ));
+    }
     let mcontext = unsafe { *ucontext.uc_mcontext };
     let ss = mcontext.__ss;
 
@@ -717,11 +735,18 @@ fn write_crash<W: Write>(
 }
 
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-fn write_crash<W: Write>(
+unsafe fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
+    if ucontext.uc_mcontext.is_null() || !ucontext.uc_mcontext.is_aligned() {
+        writeln!(
+            writer,
+            "Received signal {signal} (null or unaligned uc_mcontext)"
+        )?;
+        return Ok(());
+    }
     let mcontext = unsafe { &*ucontext.uc_mcontext };
     writeln!(
         writer,
@@ -733,11 +758,18 @@ fn write_crash<W: Write>(
 }
 
 #[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
-fn write_crash<W: Write>(
+unsafe fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
+    if ucontext.uc_mcontext.is_null() || !ucontext.uc_mcontext.is_aligned() {
+        writeln!(
+            writer,
+            "Received signal {signal} (null or unaligned uc_mcontext)"
+        )?;
+        return Ok(());
+    }
     let mcontext = unsafe { *ucontext.uc_mcontext };
 
     writeln!(
@@ -902,28 +934,32 @@ fn write_crash<W: Write>(
 }
 
 #[cfg(windows)]
-fn write_crash<W: Write>(
+unsafe fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     exception_pointers: *mut EXCEPTION_POINTERS,
 ) -> Result<(), std::io::Error> {
-    // TODO add fault addr for other platforms.
-    unsafe {
+    if exception_pointers.is_null() || !exception_pointers.is_aligned() {
+        writeln!(
+            writer,
+            "Received exception (null or unaligned EXCEPTION_POINTERS)"
+        )?;
+        return Ok(());
+    }
+    let rec_ptr = unsafe { (*exception_pointers).ExceptionRecord };
+    let record_opt = if rec_ptr.is_aligned() {
+        unsafe { rec_ptr.as_ref() }
+    } else {
+        None
+    };
+    if let Some(record) = record_opt {
         writeln!(
             writer,
             "Received exception {:0x} at address {:x}",
-            (*exception_pointers)
-                .ExceptionRecord
-                .as_mut()
-                .unwrap()
-                .ExceptionCode
-                .0,
-            (*exception_pointers)
-                .ExceptionRecord
-                .as_mut()
-                .unwrap()
-                .ExceptionAddress as usize
-        )
-    }?;
+            record.ExceptionCode.0, record.ExceptionAddress as usize
+        )?;
+    } else {
+        writeln!(writer, "Received exception (null ExceptionRecord)")?;
+    }
 
     Ok(())
 }
@@ -939,7 +975,6 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 }
 
 #[cfg(any(target_os = "freebsd", target_os = "netbsd"))]
-#[expect(clippy::cast_ptr_alignment)]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
     let mut s: usize = 0;
     #[cfg(target_os = "freebsd")]
@@ -960,44 +995,56 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
         libc::sysctl(
             mib,
             miblen,
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
             &mut s,
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
             0,
         )
     } == 0
     {
-        s = s * 4 / 3;
-        let mut buf: std::boxed::Box<[u8]> = vec![0; s].into_boxed_slice();
-        let bufptr = buf.as_mut_ptr() as *mut libc::c_void;
-        if unsafe { libc::sysctl(mib, miblen, bufptr, &mut s, std::ptr::null_mut(), 0) } == 0 {
-            let mut start = bufptr as usize;
-            let end = start + s;
+        s = s.saturating_add(s / 3);
+        let mut buf: alloc::boxed::Box<[u8]> = vec![0; s].into_boxed_slice();
+        let bufptr = buf.as_mut_ptr().cast::<libc::c_void>();
+        if unsafe { libc::sysctl(mib, miblen, bufptr, &mut s, core::ptr::null_mut(), 0) } == 0 {
+            let valid_len = s.min(buf.len());
+            let path_off = core::mem::offset_of!(libc::kinfo_vmentry, kve_path);
+            let start_off = core::mem::offset_of!(libc::kinfo_vmentry, kve_start);
+            let end_off = core::mem::offset_of!(libc::kinfo_vmentry, kve_end);
+            let mut offset = 0usize;
 
-            unsafe {
-                while start < end {
-                    let entry = start as *mut u8 as *mut libc::kinfo_vmentry;
-                    #[cfg(target_os = "freebsd")]
-                    let sz: usize = (*entry)
-                        .kve_structsize
+            while offset
+                .checked_add(path_off)
+                .is_some_and(|end| end <= valid_len)
+            {
+                #[cfg(target_os = "freebsd")]
+                let Ok(sz) = ({
+                    let sz_off = core::mem::offset_of!(libc::kinfo_vmentry, kve_structsize);
+                    let raw: [u8; size_of::<libc::c_int>()] = buf
+                        [offset + sz_off..offset + sz_off + size_of::<libc::c_int>()]
                         .try_into()
-                        .expect("invalid kve_structsize value");
-                    #[cfg(target_os = "netbsd")]
-                    let sz = size_of::<libc::kinfo_vmentry>();
-                    if sz == 0 {
-                        break;
-                    }
-
-                    let i = format!(
-                        "{}-{} {:?}\n",
-                        (*entry).kve_start,
-                        (*entry).kve_end,
-                        (*entry).kve_path
-                    );
-                    writer.write_all(&i.into_bytes())?;
-
-                    start += sz;
-                }
+                        .unwrap();
+                    usize::try_from(libc::c_int::from_ne_bytes(raw))
+                }) else {
+                    break;
+                };
+                #[cfg(target_os = "netbsd")]
+                let sz = size_of::<libc::kinfo_vmentry>();
+                let Some(next) = offset
+                    .checked_add(sz)
+                    .filter(|&n| sz >= path_off && n <= valid_len)
+                else {
+                    break;
+                };
+                let entry = &buf[offset..next];
+                let start = u64::from_ne_bytes(entry[start_off..start_off + 8].try_into().unwrap());
+                let end = u64::from_ne_bytes(entry[end_off..end_off + 8].try_into().unwrap());
+                let path_bytes = &entry[path_off..];
+                let path = core::ffi::CStr::from_bytes_until_nul(path_bytes).map_or_else(
+                    |_| String::from_utf8_lossy(path_bytes),
+                    core::ffi::CStr::to_string_lossy,
+                );
+                writeln!(writer, "{start}-{end} {path:?}")?;
+                offset = next;
             }
         } else {
             return Err(std::io::Error::last_os_error());
@@ -1011,21 +1058,20 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 
 #[cfg(target_os = "openbsd")]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
-    let mut pentry = std::mem::MaybeUninit::<libc::kinfo_vmentry>::uninit();
+    let mut pentry = core::mem::MaybeUninit::<libc::kinfo_vmentry>::zeroed();
     let mut s = size_of::<libc::kinfo_vmentry>();
     let arr = &[libc::CTL_KERN, libc::KERN_PROC_VMMAP, unsafe {
         libc::getpid()
     }];
     let mib = arr.as_ptr();
     let miblen = arr.len() as u32;
-    unsafe { (*pentry.as_mut_ptr()).kve_start = 0 };
     if unsafe {
         libc::sysctl(
             mib,
             miblen,
             pentry.as_mut_ptr() as *mut libc::c_void,
             &mut s,
-            std::ptr::null_mut(),
+            core::ptr::null_mut(),
             0,
         )
     } == 0
@@ -1038,7 +1084,7 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
                 miblen,
                 &mut e as *mut libc::kinfo_vmentry as *mut libc::c_void,
                 &mut s,
-                std::ptr::null_mut(),
+                core::ptr::null_mut(),
                 0,
             ) == 0
             {
@@ -1060,47 +1106,40 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 
 #[cfg(target_vendor = "apple")]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
-    let mut ptask = core::mem::MaybeUninit::<mach_port_t>::uninit();
-    // We start by the lowest virtual address from the userland' standpoint
+    let task = unsafe { mach_task_self() };
     let mut addr: mach_vm_address_t = 0;
-    let mut _cnt: mach_msg_type_number_t = 0;
+    let mut cnt: mach_msg_type_number_t;
     let mut sz: mach_vm_size_t = 0;
     let mut reg: natural_t = 1;
 
-    let mut r = unsafe { libc::task_for_pid(mach_task_self(), libc::getpid(), ptask.as_mut_ptr()) };
-    if r != libc::KERN_SUCCESS {
-        return Err(std::io::Error::last_os_error());
-    }
-
-    let task = unsafe { ptask.assume_init() };
-
     loop {
-        let mut pvminfo = core::mem::MaybeUninit::<vm_region_submap_info_64>::uninit();
-        _cnt = mach_msg_type_number_t::try_from(
+        let mut pvminfo = core::mem::MaybeUninit::<vm_region_submap_info_64>::zeroed();
+        cnt = mach_msg_type_number_t::try_from(
             size_of::<vm_region_submap_info_64>() / size_of::<natural_t>(),
         )
         .unwrap();
-        r = unsafe {
+        let r = unsafe {
             mach_vm_region_recurse(
                 task,
                 &raw mut addr,
                 &raw mut sz,
                 &raw mut reg,
                 pvminfo.as_mut_ptr() as vm_region_recurse_info_t,
-                &raw mut _cnt,
+                &raw mut cnt,
             )
         };
         if r != libc::KERN_SUCCESS {
             break;
         }
+        let Some(next) = addr.checked_add(sz).filter(|&n| n > addr) else {
+            break;
+        };
 
         let vminfo = unsafe { pvminfo.assume_init() };
-        // We are only interested by the first level of the maps
         if vminfo.is_submap == 0 {
-            let i = format!("{}-{}\n", addr, addr + sz);
-            writer.write_all(&i.into_bytes())?;
+            writeln!(writer, "{addr}-{next}")?;
         }
-        addr += sz;
+        addr = next;
     }
 
     Ok(())
@@ -1122,22 +1161,20 @@ fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Er
 
 #[cfg(target_os = "haiku")]
 fn write_minibsod<W: Write>(writer: &mut BufWriter<W>) -> Result<(), std::io::Error> {
-    let p = std::mem::MaybeUninit::<libc::image_info>::uninit();
-    let mut info = unsafe { p.assume_init() };
+    let mut p = core::mem::MaybeUninit::<libc::image_info>::zeroed();
     let mut c: i32 = 0;
 
-    loop {
-        if unsafe { libc::get_next_image_info(0, &mut c, &mut info) } == libc::B_OK {
-            let i = format!(
-                "{}-{} {:?}\n",
-                info.text as i64,
-                info.text as i64 + i64::from(info.text_size),
-                info.name
-            );
-            writer.write_all(&i.into_bytes())?;
-        } else {
-            break;
-        }
+    // Avoid `assume_init_ref`: `libc::image_info` contains non-nullable `fn()` fields that Haiku sets to NULL.
+    while unsafe { libc::get_next_image_info(0, &mut c, p.as_mut_ptr()) } == libc::B_OK {
+        let ptr = p.as_ptr();
+        let (text, size, name) = unsafe {
+            (
+                (*ptr).text as usize,
+                (*ptr).text_size.max(0) as usize,
+                &(*ptr).name,
+            )
+        };
+        writeln!(writer, "{text}-{} {name:?}", text.saturating_add(size))?;
     }
 
     Ok(())
@@ -1197,9 +1234,14 @@ fn shorten_backtrace(raw: &str) -> String {
 }
 
 /// Generates a mini-BSOD given a signal and context.
+///
+/// # Safety
+/// If `ucontext` is `Some`, any target-specific raw pointers inside `ucontext` (such as
+/// `uc_mcontext` on Apple platforms) that are non-null and aligned must point to valid,
+/// initialized machine context records for the duration of this call.
 #[cfg(unix)]
 #[allow(clippy::non_ascii_literal)]
-pub fn generate_minibsod<W: Write>(
+pub unsafe fn generate_minibsod<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
     _siginfo: &siginfo_t,
@@ -1207,11 +1249,25 @@ pub fn generate_minibsod<W: Write>(
 ) -> Result<(), std::io::Error> {
     writeln!(writer, "{:━^100}", " CRASH ")?;
     if let Some(uctx) = ucontext {
+        #[cfg(target_vendor = "apple")]
+        unsafe {
+            write_crash(writer, signal, uctx)?;
+        }
+        #[cfg(not(target_vendor = "apple"))]
         write_crash(writer, signal, uctx)?;
 
         #[cfg(target_pointer_width = "64")]
         {
             writeln!(writer, "{:━^100}", " REGISTERS ")?;
+            #[cfg(target_vendor = "apple")]
+            if let Err(err) = unsafe { dump_registers(writer, uctx) } {
+                if err.kind() == std::io::ErrorKind::InvalidInput {
+                    writeln!(writer, "{err}")?;
+                } else {
+                    return Err(err);
+                }
+            }
+            #[cfg(not(target_vendor = "apple"))]
             dump_registers(writer, uctx)?;
         }
     } else {
@@ -1225,8 +1281,11 @@ pub fn generate_minibsod<W: Write>(
 }
 
 /// Generates a mini-BSOD given a signal and context and dump it to a [`Vec`]
+///
+/// # Safety
+/// Same safety requirements as [`generate_minibsod`].
 #[cfg(unix)]
-pub fn generate_minibsod_to_vec(
+pub unsafe fn generate_minibsod_to_vec(
     signal: Signal,
     siginfo: &siginfo_t,
     ucontext: Option<&ucontext_t>,
@@ -1235,7 +1294,7 @@ pub fn generate_minibsod_to_vec(
     {
         let mut writer = BufWriter::new(&mut bsod);
 
-        generate_minibsod(&mut writer, signal, siginfo, ucontext)?;
+        unsafe { generate_minibsod(&mut writer, signal, siginfo, ucontext)? };
 
         writer.flush()?;
     }
@@ -1243,18 +1302,29 @@ pub fn generate_minibsod_to_vec(
 }
 
 /// Generates a mini-BSOD given an `EXCEPTION_POINTERS` structure.
+///
+/// # Safety
+/// If `exception_pointers` is non-null, it must point to a valid `EXCEPTION_POINTERS` instance
+/// whose non-null `ExceptionRecord` and `ContextRecord` fields point to valid OS records.
 #[cfg(windows)]
-#[allow(clippy::non_ascii_literal, clippy::not_unsafe_ptr_arg_deref)]
-pub fn generate_minibsod<W: Write>(
+#[allow(clippy::non_ascii_literal)]
+pub unsafe fn generate_minibsod<W: Write>(
     writer: &mut BufWriter<W>,
     exception_pointers: *mut EXCEPTION_POINTERS,
 ) -> Result<(), std::io::Error> {
     writeln!(writer, "{:━^100}", " CRASH ")?;
-    write_crash(writer, exception_pointers)?;
+    unsafe { write_crash(writer, exception_pointers)? };
     writeln!(writer, "{:━^100}", " REGISTERS ")?;
-    dump_registers(writer, unsafe {
-        (*exception_pointers).ContextRecord.as_mut().unwrap()
-    })?;
+    if !exception_pointers.is_null()
+        && exception_pointers.is_aligned()
+        && let ctx_ptr = unsafe { (*exception_pointers).ContextRecord }
+        && ctx_ptr.is_aligned()
+        && let Some(ctx) = unsafe { ctx_ptr.as_ref() }
+    {
+        dump_registers(writer, ctx)?;
+    } else {
+        writeln!(writer, "ContextRecord is null or unaligned")?;
+    }
     writeln!(writer, "{:━^100}", " BACKTRACE ")?;
     let backtrace = std::backtrace::Backtrace::force_capture();
     writeln!(writer, "{}", shorten_backtrace(&format!("{backtrace:?}")))?;
@@ -1268,16 +1338,54 @@ mod tests {
 
     use std::io::{BufWriter, stdout};
 
+    use exceptional::unix_signals::Signal;
+    #[cfg(not(target_vendor = "apple"))]
     use exceptional::unix_signals::ucontext;
+    #[cfg(target_vendor = "apple")]
+    use exceptional::unix_signals::ucontext_t;
 
-    use crate::dump_registers;
+    use crate::{dump_registers, generate_minibsod_to_vec};
 
     #[test]
     #[cfg_attr(miri, ignore)]
     fn test_dump_registers() {
-        let ucontext = ucontext().unwrap();
         let mut writer = BufWriter::new(stdout());
-        dump_registers(&mut writer, &ucontext).unwrap();
+        #[cfg(target_vendor = "apple")]
+        {
+            let mut uctx: ucontext_t = unsafe { core::mem::zeroed() };
+            assert!(unsafe { dump_registers(&mut writer, &uctx) }.is_err());
+            #[cfg(target_arch = "aarch64")]
+            let mut mctx: exceptional::unix_signals::mcontext64 = unsafe { core::mem::zeroed() };
+            #[cfg(target_arch = "x86_64")]
+            let mut mctx: libc::__darwin_mcontext64 = unsafe { core::mem::zeroed() };
+            uctx.uc_mcontext = &raw mut mctx;
+            unsafe { dump_registers(&mut writer, &uctx) }.unwrap();
+        }
+        #[cfg(not(target_vendor = "apple"))]
+        {
+            let ucontext = ucontext().unwrap();
+            dump_registers(&mut writer, &ucontext).unwrap();
+        }
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_generate_minibsod_to_vec() {
+        #[cfg(target_vendor = "apple")]
+        let uctx: ucontext_t = unsafe { core::mem::zeroed() };
+        #[cfg(not(target_vendor = "apple"))]
+        let uctx = ucontext().unwrap();
+        let siginfo: libc::siginfo_t = unsafe { core::mem::zeroed() };
+        let bytes = unsafe {
+            generate_minibsod_to_vec(Signal::SigSegmentationFault, &siginfo, Some(&uctx))
+        }
+        .unwrap();
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(text.contains("CRASH") && text.contains("BACKTRACE") && text.contains("MAPS"));
+
+        let bytes_no_ctx =
+            unsafe { generate_minibsod_to_vec(Signal::SigAbort, &siginfo, None) }.unwrap();
+        assert!(String::from_utf8_lossy(&bytes_no_ctx).contains("Received signal SIGABRT"));
     }
 }
 
@@ -1301,7 +1409,7 @@ mod tests {
         },
     };
 
-    use crate::minibsod::dump_registers;
+    use crate::dump_registers;
 
     #[derive(Default)]
     #[repr(align(16))]
