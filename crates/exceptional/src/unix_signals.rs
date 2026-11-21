@@ -2,18 +2,17 @@
 #[cfg(feature = "std")]
 use alloc::ffi::CString;
 #[cfg(feature = "alloc")]
-use alloc::vec::Vec;
+use alloc::{boxed::Box, vec::Vec};
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 use core::mem::size_of;
-#[cfg(feature = "alloc")]
-use core::{
-    cell::UnsafeCell,
-    ptr::{self, write_volatile},
-    sync::atomic::{Ordering, compiler_fence},
-};
 use core::{
     fmt::{self, Display, Formatter},
     mem,
+};
+#[cfg(feature = "alloc")]
+use core::{
+    ptr,
+    sync::atomic::{AtomicPtr, Ordering},
 };
 
 use libafl_core::format;
@@ -257,8 +256,8 @@ use libc::ssize_t;
 pub use libc::ucontext_t;
 #[cfg(feature = "alloc")]
 use libc::{
-    SA_NODEFER, SA_ONSTACK, SA_SIGINFO, malloc, sigaction, sigaddset, sigaltstack, sigemptyset,
-    stack_t,
+    SA_NODEFER, SA_ONSTACK, SA_SIGINFO, free, malloc, sigaction, sigaddset, sigaltstack,
+    sigemptyset, stack_t,
 };
 use libc::{
     SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE, SIGQUIT, SIGSEGV,
@@ -404,51 +403,77 @@ pub trait SignalHandler {
 }
 
 #[cfg(feature = "alloc")]
-struct HandlerHolder {
-    handler: UnsafeCell<*mut dyn SignalHandler>,
-}
+struct HandlerHolder(*mut dyn SignalHandler);
 
 #[cfg(feature = "alloc")]
 unsafe impl Send for HandlerHolder {}
+#[cfg(feature = "alloc")]
+unsafe impl Sync for HandlerHolder {}
 
 /// Let's get 8 mb for now.
 #[cfg(feature = "alloc")]
 const SIGNAL_STACK_SIZE: usize = 2 << 22;
 
-/// To be able to handle SIGSEGV when the stack is exhausted, we need our own little stack space.
 #[cfg(feature = "alloc")]
-static mut SIGNAL_STACK_PTR: *mut c_void = ptr::null_mut();
+const MAX_SIGNALS: usize = 128;
 
-/// Keep track of which handler is registered for which signal
+/// Keep track of which handler is registered for which signal using atomic pointers.
 #[cfg(feature = "alloc")]
-static mut SIGNAL_HANDLERS: [Option<HandlerHolder>; 32] = [
-    // We cannot use [None; 32] because it requires Copy. Ugly, but I don't think there's an
-    // alternative.
-    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-    None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-];
+static SIGNAL_HANDLERS: [AtomicPtr<HandlerHolder>; MAX_SIGNALS] =
+    [const { AtomicPtr::new(ptr::null_mut()) }; MAX_SIGNALS];
 
-/// Internal function that is being called whenever a signal we are registered for arrives.
+#[cfg(feature = "alloc")]
+struct ExitOnUnwind;
+
+#[cfg(feature = "alloc")]
+impl Drop for ExitOnUnwind {
+    fn drop(&mut self) {
+        const MSG: &[u8] = b"Signal handler panicked\n";
+        // SAFETY: `write(2)` and `_exit(2)` are async-signal-safe; avoids allocator `free()`
+        // and prevents `sigreturn` loops on synchronous hardware faults.
+        unsafe {
+            let _n = libc::write(libc::STDERR_FILENO, MSG.as_ptr().cast(), MSG.len());
+            libc::_exit(101);
+        }
+    }
+}
+
+/// Internal C-ABI signal trampoline invoked whenever a registered signal arrives.
 ///
 /// # Safety
-/// This should be somewhat safe to call for signals previously registered,
-/// unless the signal handlers registered using [`setup_signal_handler()`] are broken.
+/// Must only be invoked by the OS signal delivery mechanism (or with valid `siginfo_t` /
+/// `ucontext_t` pointers) for signals configured via [`setup_signal_handler()`].
 #[cfg(feature = "alloc")]
-unsafe fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
+unsafe extern "C" fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
+    let unwind_guard = ExitOnUnwind;
     unsafe {
-        let signal = &Signal::try_from(sig).unwrap();
-        let handler = {
-            match &SIGNAL_HANDLERS[*signal as usize] {
-                Some(handler_holder) => &mut **handler_holder.handler.get(),
-                None => return,
-            }
-        };
-        handler.handle(
-            *signal,
-            &mut ptr::read_unaligned(info),
-            (void as *mut ucontext_t).as_mut(),
-        );
+        if let Ok(signal) = Signal::try_from(sig)
+            && (signal as usize) < MAX_SIGNALS
+            && let Some(holder) = SIGNAL_HANDLERS[signal as usize]
+                .load(Ordering::Acquire)
+                .as_ref()
+            && let Some(handler) = holder.0.as_mut()
+        {
+            let mut fallback_info: siginfo_t;
+            let info_ref = if info.is_null() {
+                fallback_info = mem::zeroed();
+                &mut fallback_info
+            } else if info.is_aligned() {
+                &mut *info
+            } else {
+                fallback_info = ptr::read_unaligned(info);
+                &mut fallback_info
+            };
+            let uctx_ptr = void.cast::<ucontext_t>();
+            let uctx = if uctx_ptr.is_aligned() {
+                uctx_ptr.as_mut()
+            } else {
+                None
+            };
+            handler.handle(signal, info_ref, uctx);
+        }
     }
+    mem::forget(unwind_guard);
 }
 
 /// Setup signal handlers in a somewhat rusty way.
@@ -458,54 +483,80 @@ unsafe fn handle_signal(sig: c_int, info: *mut siginfo_t, void: *mut c_void) {
 /// or to handle `SIGINT` in the broker process.
 ///
 /// # Safety
-///
-/// The signal handlers will be called on any signal. They should (tm) be async safe.
-/// The handler pointer will be dereferenced, and the data the pointer points to may therefore not move.
-/// A lot can go south in signal handling. Be sure you know what you are doing.
+/// `handler` must be non-null, aligned, and point to a valid `T` at a stable address for as long
+/// as the signal handlers stay installed, without concurrent `&T`/`&mut T` aliasing. Because
+/// `SA_NODEFER` permits reentrant delivery (and `siglongjmp`), `T` must be zero-sized or guarantee
+/// `SignalHandler::handle` is never entered reentrantly or concurrently across threads.
 #[cfg(feature = "alloc")]
 pub unsafe fn setup_signal_handler<T: 'static + SignalHandler>(
     handler: *mut T,
 ) -> Result<(), Error> {
+    if handler.is_null() || !handler.is_aligned() {
+        return Err(Error::illegal_argument(
+            "Signal handler pointer must be non-null and properly aligned",
+        ));
+    }
     unsafe {
-        // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
-        if SIGNAL_STACK_PTR.is_null() {
-            SIGNAL_STACK_PTR = malloc(SIGNAL_STACK_SIZE);
-
-            // Rust always panics on OOM, so we will, too.
-            assert!(
-                !SIGNAL_STACK_PTR.is_null(),
-                "Failed to allocate signal stack with {SIGNAL_STACK_SIZE} bytes!"
-            );
-        }
-        let mut ss: stack_t = mem::zeroed();
-        ss.ss_size = SIGNAL_STACK_SIZE;
-        ss.ss_sp = SIGNAL_STACK_PTR;
-        sigaltstack(&raw mut ss, ptr::null_mut() as _);
-
-        let mut sa: sigaction = mem::zeroed();
-        sigemptyset(&raw mut sa.sa_mask);
-        sigaddset(&raw mut sa.sa_mask, SIGALRM);
-        sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
-        sa.sa_sigaction = handle_signal as *const () as usize;
         let signals = (*handler).signals();
-        for sig in signals {
-            write_volatile(
-                &raw mut SIGNAL_HANDLERS[sig as usize],
-                Some(HandlerHolder {
-                    handler: UnsafeCell::new(handler as *mut dyn SignalHandler),
-                }),
-            );
-
-            if sigaction(sig as i32, &raw mut sa, ptr::null_mut()) < 0 {
-                #[cfg(feature = "std")]
-                {
-                    let err_str = CString::new(format!("Failed to setup {sig} handler")).unwrap();
-                    libc::perror(err_str.as_ptr());
-                }
-                return Err(Error::unknown(format!("Could not set up {sig} handler")));
+        for &sig in &signals {
+            let sig_idx = sig as usize;
+            if sig_idx >= MAX_SIGNALS {
+                return Err(Error::illegal_argument(format!(
+                    "Signal number {sig_idx} exceeds MAX_SIGNALS ({MAX_SIGNALS})"
+                )));
             }
         }
-        compiler_fence(Ordering::SeqCst);
+
+        let mut current_ss: stack_t = mem::zeroed();
+        let needs_altstack = if sigaltstack(ptr::null(), &raw mut current_ss) == 0 {
+            (current_ss.ss_flags & libc::SS_DISABLE) != 0 || current_ss.ss_size < SIGNAL_STACK_SIZE
+        } else {
+            true
+        };
+        if needs_altstack {
+            let allocated = malloc(SIGNAL_STACK_SIZE);
+            assert!(
+                !allocated.is_null(),
+                "Failed to allocate signal stack with {SIGNAL_STACK_SIZE} bytes!"
+            );
+            let mut ss: stack_t = mem::zeroed();
+            ss.ss_size = SIGNAL_STACK_SIZE;
+            ss.ss_sp = allocated;
+            if sigaltstack(&raw const ss, ptr::null_mut()) < 0 {
+                free(allocated);
+            }
+        }
+
+        if !signals.is_empty() {
+            let mut sa: sigaction = mem::zeroed();
+            sigemptyset(&raw mut sa.sa_mask);
+            sigaddset(&raw mut sa.sa_mask, SIGALRM);
+            sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
+            sa.sa_sigaction = handle_signal as *const () as usize;
+
+            let shared_holder =
+                Box::into_raw(Box::new(HandlerHolder(handler as *mut dyn SignalHandler)));
+            let mut installed: Vec<(Signal, *mut HandlerHolder, sigaction)> =
+                Vec::with_capacity(signals.len());
+            for sig in signals {
+                let sig_idx = sig as usize;
+                let prev = SIGNAL_HANDLERS[sig_idx].swap(shared_holder, Ordering::AcqRel);
+                let mut old_sa: sigaction = mem::zeroed();
+                if sigaction(sig as i32, &raw const sa, &raw mut old_sa) < 0 {
+                    #[cfg(feature = "std")]
+                    if let Ok(err_str) = CString::new(format!("Failed to setup {sig} handler")) {
+                        libc::perror(err_str.as_ptr());
+                    }
+                    SIGNAL_HANDLERS[sig_idx].store(prev, Ordering::Release);
+                    for (s, old_ptr, prev_sa) in installed.into_iter().rev() {
+                        sigaction(s as i32, &raw const prev_sa, ptr::null_mut());
+                        SIGNAL_HANDLERS[s as usize].store(old_ptr, Ordering::Release);
+                    }
+                    return Err(Error::unknown(format!("Could not set up {sig} handler")));
+                }
+                installed.push((sig, prev, old_sa));
+            }
+        }
 
         Ok(())
     }
@@ -522,25 +573,134 @@ pub unsafe fn setup_signal_handler<T: 'static + SignalHandler>(
 #[expect(clippy::inline_always)] // we assume that inlining will destroy less state
 #[inline(always)]
 pub fn ucontext() -> Result<ucontext_t, Error> {
-    let mut ucontext = unsafe { mem::zeroed() };
-    if cfg!(not(any(target_os = "openbsd", target_os = "haiku"))) {
-        if unsafe { getcontext(&raw mut ucontext) } == 0 {
-            Ok(ucontext)
-        } else {
-            #[cfg(not(feature = "std"))]
-            unsafe {
-                libc::perror(b"Failed to get ucontext\n".as_ptr() as _);
-            };
-            #[cfg(not(feature = "std"))]
-            return Err(Error::unknown("Failed to get ucontex"));
-
-            #[cfg(feature = "std")]
-            Err(Error::unknown(format!(
-                "Failed to get ucontext: {:?}",
-                Errno::last()
-            )))
+    #[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
+    {
+        // `libc::ucontext_t` on `x86_64` Apple omits trailing `__mcontext_data` (712 B) that
+        // `getcontext` populates directly after `uc_mcontext`.
+        #[repr(C)]
+        struct FullUcontext {
+            uc: ucontext_t,
+            mcontext_data: libc::__darwin_mcontext64,
         }
-    } else {
-        Ok(ucontext)
+        static ZERO_MCTX: libc::__darwin_mcontext64 = unsafe { mem::zeroed() };
+        let mut full = unsafe { mem::zeroed::<FullUcontext>() };
+        return if unsafe { getcontext(&raw mut full.uc) } == 0 {
+            full.uc.uc_mcontext = (&raw const ZERO_MCTX).cast_mut();
+            Ok(full.uc)
+        } else {
+            ucontext_err()
+        };
+    }
+
+    #[cfg(not(all(target_vendor = "apple", target_arch = "x86_64")))]
+    {
+        let mut ucontext = unsafe { mem::zeroed::<ucontext_t>() };
+        if cfg!(not(any(target_os = "openbsd", target_os = "haiku"))) {
+            if unsafe { getcontext(&raw mut ucontext) } == 0 {
+                #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+                {
+                    static ZERO_MCTX: mcontext64 = unsafe { mem::zeroed() };
+                    ucontext.uc_mcontext = (&raw const ZERO_MCTX).cast_mut();
+                }
+                Ok(ucontext)
+            } else {
+                ucontext_err()
+            }
+        } else {
+            Ok(ucontext)
+        }
+    }
+}
+
+#[cfg(unix)]
+#[cold]
+fn ucontext_err() -> Result<ucontext_t, Error> {
+    #[cfg(not(feature = "std"))]
+    {
+        unsafe { libc::perror(c"Failed to get ucontext".as_ptr()) };
+        Err(Error::unknown("Failed to get ucontext"))
+    }
+    #[cfg(feature = "std")]
+    Err(Error::unknown(format!(
+        "Failed to get ucontext: {:?}",
+        Errno::last()
+    )))
+}
+
+#[cfg(all(test, unix, feature = "std"))]
+mod tests {
+    use core::{
+        ptr::{self, NonNull},
+        sync::atomic::{AtomicUsize, Ordering},
+    };
+
+    use super::{
+        Signal, SignalHandler, handle_signal, setup_signal_handler, siginfo_t, ucontext_t,
+    };
+
+    static TEST_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    struct ZstSignalHandler;
+
+    impl SignalHandler for ZstSignalHandler {
+        unsafe fn handle(
+            &mut self,
+            signal: Signal,
+            _info: &mut siginfo_t,
+            _context: Option<&mut ucontext_t>,
+        ) {
+            if signal == Signal::SigUser2 && TEST_CALLS.fetch_add(1, Ordering::SeqCst) == 0 {
+                unsafe {
+                    handle_signal(Signal::SigAlarm as i32, ptr::null_mut(), ptr::null_mut());
+                }
+            } else {
+                TEST_CALLS.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+
+        fn signals(&self) -> alloc::vec::Vec<Signal> {
+            alloc::vec![Signal::SigUser2, Signal::SigAlarm]
+        }
+    }
+
+    #[test]
+    fn test_signal_trampoline() {
+        TEST_CALLS.store(0, Ordering::SeqCst);
+        assert!(unsafe { setup_signal_handler(ptr::null_mut::<ZstSignalHandler>()) }.is_err());
+
+        unsafe {
+            handle_signal(9999, ptr::null_mut(), ptr::null_mut());
+            handle_signal(Signal::SigUser2 as i32, ptr::null_mut(), ptr::null_mut());
+
+            let handler_ptr = NonNull::<ZstSignalHandler>::dangling().as_ptr();
+            #[cfg(not(miri))]
+            setup_signal_handler(handler_ptr).unwrap();
+            #[cfg(miri)]
+            {
+                let holder = alloc::boxed::Box::into_raw(alloc::boxed::Box::new(
+                    super::HandlerHolder(handler_ptr as *mut dyn SignalHandler),
+                ));
+                for sig in [Signal::SigUser2, Signal::SigAlarm] {
+                    super::SIGNAL_HANDLERS[sig as usize].store(holder, Ordering::Release);
+                }
+            }
+            let mut unaligned = [0u8; size_of::<siginfo_t>() + 1];
+            handle_signal(
+                Signal::SigUser2 as i32,
+                unaligned.as_mut_ptr().add(1).cast::<siginfo_t>(),
+                ptr::null_mut(),
+            );
+            #[cfg(miri)]
+            {
+                let holder = super::SIGNAL_HANDLERS[Signal::SigUser2 as usize]
+                    .swap(ptr::null_mut(), Ordering::AcqRel);
+                super::SIGNAL_HANDLERS[Signal::SigAlarm as usize]
+                    .store(ptr::null_mut(), Ordering::Release);
+                drop(alloc::boxed::Box::from_raw(holder));
+            }
+        }
+        assert_eq!(TEST_CALLS.load(Ordering::SeqCst), 2);
+        #[cfg(not(miri))]
+        let _uctx = super::ucontext().unwrap();
     }
 }
