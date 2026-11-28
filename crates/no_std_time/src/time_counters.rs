@@ -1,6 +1,11 @@
 //! Fast implementations for specific CPU architectures.
 
-#[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
+#[cfg(any(
+    target_arch = "aarch64",
+    target_arch = "arm",
+    target_arch = "riscv64",
+    target_arch = "riscv32"
+))]
 use core::arch::asm;
 
 #[cfg(not(any(
@@ -68,9 +73,12 @@ pub fn read_time_counter() -> u64 {
 #[cfg(target_arch = "riscv64")]
 #[must_use]
 pub fn read_time_counter() -> u64 {
-    let mut v: u64;
+    let v: u64;
     unsafe {
-        asm!("rdcycle {v}", v = out(reg) v);
+        #[cfg(target_os = "none")]
+        asm!("rdcycle {v}", v = out(reg) v, options(nomem, nostack));
+        #[cfg(not(target_os = "none"))]
+        asm!("rdtime {v}", v = out(reg) v, options(nomem, nostack));
     }
     v
 }
@@ -83,22 +91,35 @@ pub fn read_time_counter() -> u64 {
 #[cfg(target_arch = "riscv32")]
 #[must_use]
 pub fn read_time_counter() -> u64 {
-    let mut v: u64;
-    let mut hg: u32;
-    let mut lw: u32;
-    let mut cmp: u32;
+    let hg: u32;
+    let lw: u32;
     unsafe {
-        asm!("jmp%=:",
-             "rdcycleh {hg}",
-             "rdcycle {lw}",
-             "rdcycleh {cmp}",
-             "bne {hg}, {cmp}, jmp%=",
-             hg = out(reg) hg,
-             lw = out(reg) lw,
-             cmp = out(reg) cmp);
-        v = ((hg as u64) << 32) | lw as u64;
+        #[cfg(target_os = "none")]
+        asm!(
+            "2:",
+            "rdcycleh {hg}",
+            "rdcycle {lw}",
+            "rdcycleh {cmp}",
+            "bne {hg}, {cmp}, 2b",
+            hg = out(reg) hg,
+            lw = out(reg) lw,
+            cmp = out(reg) _,
+            options(nomem, nostack),
+        );
+        #[cfg(not(target_os = "none"))]
+        asm!(
+            "2:",
+            "rdtimeh {hg}",
+            "rdtime {lw}",
+            "rdtimeh {cmp}",
+            "bne {hg}, {cmp}, 2b",
+            hg = out(reg) hg,
+            lw = out(reg) lw,
+            cmp = out(reg) _,
+            options(nomem, nostack),
+        );
     }
-    v
+    (u64::from(hg) << 32) | u64::from(lw)
 }
 
 /// Read a timestamp for measurements.
@@ -118,4 +139,13 @@ pub fn read_time_counter() -> u64 {
 #[must_use]
 pub fn read_time_counter() -> u64 {
     current_nanos()
+}
+
+#[cfg(all(test, not(target_arch = "arm")))]
+mod tests {
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_read_time_counter() {
+        core::hint::black_box(super::read_time_counter());
+    }
 }
